@@ -742,10 +742,14 @@ async function asGet(params) {
 }
 
 async function asPost(payload) {
+  // Kirim sebagai form-urlencoded untuk menghindari CORS preflight
+  // Apps Script tidak support preflight OPTIONS request
+  const formData = new FormData();
+  formData.append('payload', JSON.stringify(payload));
+  
   const res = await fetch(AS_URL, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({...payload, token: authToken})
+    body: formData
   });
   return res.json();
 }
