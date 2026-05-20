@@ -1133,6 +1133,26 @@ function renderCards(){
         }
       }
 
+      // Hitung perubahan vs periode sebelumnya untuk kolom tabel
+      const aNumRow=parseRaw(av);
+      const prevEntryRow=[...historyData].reverse().find(r=>r.key===m.key&&r.periodType===inputP);
+      const prevNumRow=prevEntryRow?parseRaw(prevEntryRow.actual):null;
+      let prevCellHTML='<span style="font-size:11px;color:var(--tx3)">–</span>';
+      if(aNumRow!==null && prevNumRow!==null && prevNumRow!==0){
+        const pp=((aNumRow-prevNumRow)/prevNumRow*100);
+        const ppAbs=Math.abs(pp).toFixed(1);
+        const isUp=pp>0.5, isDown=pp<-0.5;
+        if(!isUp&&!isDown){
+          prevCellHTML='<span style="font-size:11px;color:var(--tx3)">±0%</span>';
+        } else {
+          // Warna: hijau = bagus, merah = buruk (sesuai lowerBetter)
+          const goodUp=!m.lowerBetter, goodDown=!!m.lowerBetter;
+          const color=isUp?(goodUp?'var(--green)':('var(--red)')):( goodDown?'var(--green)':('var(--red)'));
+          const arrow=isUp?'▲ +':'▼ -';
+          prevCellHTML='<span style="font-size:11px;font-weight:700;color:'+color+'">'+arrow+ppAbs+'%</span>';
+        }
+      }
+
       rows+='<tr>'
         +'<td><div class="metric-name">'+m.label
         +(m.lowerBetter?' <span style="font-size:10px;color:#854F0B">(↓ lebih baik)</span>':'')
@@ -1140,6 +1160,7 @@ function renderCards(){
         +'<td class="r"><input class="e-input actual" type="text" value="'+av+'" data-key="'+ak+'" data-pic="'+pic.id+'" placeholder="'+getPlaceholder(m,'aktual')+'" oninput="updateActual(this)"/></td>'
         +'<td class="r"><input class="e-input" type="text" value="'+tv+'" data-key="'+tk+'" data-pic="'+pic.id+'" placeholder="'+getPlaceholder(m,'target')+'" oninput="updateTarget(this)"/></td>'
         +'<td class="c">'+tlPill(status)+'</td>'
+        +'<td class="c prev-cell">'+prevCellHTML+'</td>'
         +'<td><textarea class="notes-input" rows="2" data-key="'+nk+'" placeholder="Tambahkan catatan (opsional)..." oninput="updateNotes(this)">'+nv+'</textarea></td>'
         +'</tr>';
     });
@@ -1172,6 +1193,7 @@ function renderCards(){
         +'<th class="r" style="color:#854F0B">Aktual <span style="font-weight:400">(bisa diedit)</span></th>'
         +'<th class="r">Target <span style="font-weight:400">(bisa diedit)</span></th>'
         +'<th class="c">Status</th>'
+        +'<th class="c" title="Perubahan aktual vs periode sebelumnya">vs Lalu</th>'
         +'<th>Catatan</th>'
       +'</tr></thead><tbody>'+rows+'</tbody></table>'
       // Summary sentence
@@ -1379,15 +1401,22 @@ function getNotes(m){return getNotesForPeriod(m,ui.period);}
 /* SUBMIT → HISTORY */
 // Period labels for submit dropdowns — generated dynamically
 function buildWeeklyLabels(){
-  // Use date-range labels: "11-17 Mei" style — unambiguous
+  // Semua minggu (Senin–Minggu) sejak awal 2026 sampai minggu terakhir yang selesai
   const {mon:lastMon,sun:lastSun}=getLastCompletedMonday();
+  // Cari Senin pertama >= 1 Jan 2026
+  const startYear=new Date(2026,0,1); // 1 Jan 2026
+  const startDow=startYear.getDay(); // 0=Sun,1=Mon,...
+  const daysToMon=startDow===1?0:(startDow===0?1:(8-startDow));
+  const firstMon=new Date(startYear);
+  firstMon.setDate(startYear.getDate()+daysToMon);
+
   const labels=[];
-  for(let w=7;w>=0;w--){
-    const mon=new Date(lastMon); mon.setDate(lastMon.getDate()-w*7);
-    const sun=new Date(lastSun); sun.setDate(lastSun.getDate()-w*7);
+  const cur=new Date(firstMon);
+  while(cur<=lastMon){
+    const mon=new Date(cur);
+    const sun=new Date(cur); sun.setDate(mon.getDate()+6);
     const monD=mon.getDate(), sunD=sun.getDate();
     const monM=ID_MONTHS[mon.getMonth()], sunM=ID_MONTHS[sun.getMonth()];
-    // If same month: "11-17 Mei 2026", else "28 Apr-4 Mei 2026"
     let label;
     if(mon.getMonth()===sun.getMonth()){
       label=monD+'-'+sunD+' '+sunM+' '+sun.getFullYear();
@@ -1395,15 +1424,21 @@ function buildWeeklyLabels(){
       label=monD+' '+monM+'-'+sunD+' '+sunM+' '+sun.getFullYear();
     }
     labels.push(label);
+    cur.setDate(cur.getDate()+7);
   }
   return labels;
 }
 function buildMonthlyLabels(){
+  // Semua bulan sejak Jan 2026 sampai bulan lalu
   const now=new Date();
   const labels=[];
-  for(let i=7;i>=0;i--){
-    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-    labels.push(ID_MONTHS[d.getMonth()]+' '+d.getFullYear());
+  const start=new Date(2026,0,1); // Jan 2026
+  // Sampai bulan sebelumnya (bulan berjalan belum selesai)
+  const endMonth=new Date(now.getFullYear(),now.getMonth()-1,1);
+  const cur=new Date(start);
+  while(cur<=endMonth){
+    labels.push(ID_MONTHS[cur.getMonth()]+' '+cur.getFullYear());
+    cur.setMonth(cur.getMonth()+1);
   }
   return labels;
 }
@@ -1412,11 +1447,10 @@ let WEEKLY_LABELS=[];
 let MONTHLY_LABELS=[];
 
 function getPeriodOptions(currentPeriod){
-  // Rebuild dynamic labels each call
   if(currentPeriod==='weekly') WEEKLY_LABELS=buildWeeklyLabels();
   else MONTHLY_LABELS=buildMonthlyLabels();
   const list=currentPeriod==='weekly'?WEEKLY_LABELS:MONTHLY_LABELS;
-  const lastIdx=list.length-1; // default to most recent
+  const lastIdx=list.length-1; // default: periode paling akhir (terbaru)
   return list.map((l,i)=>'<option value="'+l+'"'+(i===lastIdx?' selected':'')+'>'+l+'</option>').join('');
 }
 
