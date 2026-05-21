@@ -1084,136 +1084,116 @@ const TREND={
 };
 
 /* RENDER DASHBOARD */
-// Track which input tab is active per PIC (for the input form, not the global period toggle)
-const picInputPeriod={};
+// Per-PIC UI state
+const picInputPeriod   = {}; // 'weekly' | 'monthly'
+const picSelectedLabel = {}; // label periode yang dipilih, e.g. "11-17 Mei 2026"
+const picShowForm      = {}; // apakah form input sedang terbuka
+
+// Bangun label week berjalan (current week = bukan last completed, tapi week yang sedang berlangsung)
+function getCurrentWeekLabel(){
+  const now=new Date();
+  const dow=now.getDay(); // 0=Sun
+  // Senin minggu ini
+  const mon=new Date(now);
+  mon.setDate(now.getDate()-(dow===0?6:dow-1));
+  const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+  const monD=mon.getDate(), sunD=sun.getDate();
+  const monM=ID_MONTHS[mon.getMonth()], sunM=ID_MONTHS[sun.getMonth()];
+  if(mon.getMonth()===sun.getMonth()) return monD+'-'+sunD+' '+sunM+' '+sun.getFullYear();
+  return monD+' '+monM+'-'+sunD+' '+sunM+' '+sun.getFullYear();
+}
+
+function getCurrentMonthLabel(){
+  const now=new Date();
+  return ID_MONTHS[now.getMonth()]+' '+now.getFullYear();
+}
+
+// Cari data histori berdasarkan pic + periodLabel + metricKey
+function getHistoricActual(picId, metricKey, periodLabel){
+  return [...historyData].reverse().find(r=>
+    r.pic_id===picId && r.key===metricKey && r.period===periodLabel
+  );
+}
+
+// Cari data periode sebelumnya (entry sebelum periodLabel untuk metric yang sama)
+function getPrevEntry(picId, metricKey, periodType, currentLabel){
+  // Ambil semua entry untuk metric ini, urut dari lama ke baru
+  const entries=historyData.filter(r=>
+    r.pic_id===picId && r.key===metricKey && r.periodType===periodType
+  );
+  const idx=entries.findIndex(r=>r.period===currentLabel);
+  if(idx>0) return entries[idx-1];
+  if(idx===-1 && entries.length>0) return entries[entries.length-1];
+  return null;
+}
+
+// Apakah suatu periodLabel sudah lewat (bukan current week/month)
+function isPastPeriod(label, periodType){
+  const cur=periodType==='weekly'?getCurrentWeekLabel():getCurrentMonthLabel();
+  return label!==cur;
+}
+
+// Apakah ada data tersimpan untuk pic + periodLabel
+function hasStoredData(picId, periodLabel){
+  return historyData.some(r=>r.pic_id===picId && r.period===periodLabel);
+}
+
+// Ambil live-actuals untuk suatu periodLabel (bukan hanya weekly/monthly generic)
+// Key: metricKey + '_' + periodType + '_' + periodLabel
+function getLiveActualForLabel(metricKey, periodType, periodLabel){
+  const k = metricKey+'_'+periodType+'_'+periodLabel;
+  return live.actuals[k];
+}
+function setLiveActualForLabel(metricKey, periodType, periodLabel, val){
+  live.actuals[metricKey+'_'+periodType+'_'+periodLabel]=val;
+}
+function getLiveTargetForLabel(metricKey, periodType, periodLabel){
+  const k = metricKey+'_'+periodType+'_'+periodLabel+'_t';
+  return live.targets[k];
+}
+function setLiveTargetForLabel(metricKey, periodType, periodLabel, val){
+  live.targets[metricKey+'_'+periodType+'_'+periodLabel+'_t']=val;
+}
+function getLiveNotesForLabel(metricKey, periodType, periodLabel){
+  return live.notes[metricKey+'_'+periodType+'_'+periodLabel+'_n']||'';
+}
 
 function renderCards(){
   const grid=document.getElementById('pic-grid');
   grid.innerHTML='';
-  let ontrack=0,total=0;
+  let ontrack=0, total=0;
+
+  // Pastikan label list selalu up-to-date tiap render
+  WEEKLY_LABELS  = buildWeeklyLabels();
+  MONTHLY_LABELS = buildMonthlyLabels();
 
   PICS.forEach(pic=>{
-    // Default input tab to current global period if not yet set
-    if(!picInputPeriod[pic.id]) picInputPeriod[pic.id]=ui.period;
-    const inputP=picInputPeriod[pic.id];
+    // Init per-PIC state
+    if(!picInputPeriod[pic.id])   picInputPeriod[pic.id]='weekly';
+    const pType = picInputPeriod[pic.id];
 
-    const card=document.createElement('div');
-    card.className='pic-card';
-    const isSub=Object.keys(submitted).some(k=>k.startsWith(pic.id+'_'));
+    // Default selected label = periode berjalan
+    const curLabel = pType==='weekly'?getCurrentWeekLabel():getCurrentMonthLabel();
+    if(!picSelectedLabel[pic.id+'_'+pType]) picSelectedLabel[pic.id+'_'+pType]=curLabel;
+    const selLabel = picSelectedLabel[pic.id+'_'+pType];
 
-    // Build rows for the active input period of this card
-    let rows='';
-    let summaryParts=[];
+    const isPast     = isPastPeriod(selLabel, pType);
+    const hasData    = hasStoredData(pic.id, selLabel);
+    const showForm   = !!picShowForm[pic.id+'_'+pType+'_'+selLabel];
+    const labelList  = pType==='weekly'?WEEKLY_LABELS:MONTHLY_LABELS;
 
+    // Hitung status keseluruhan untuk summary cards
     pic.metrics.forEach(m=>{
-      const av=getActualForPeriod(pic,m,inputP);
-      const tv=getTargetForPeriod(pic,m,inputP);
-      const nv=getNotesForPeriod(m,inputP);
-      const ak=m.key+'_'+inputP;
-      const tk=ak+'_t';
-      const nk=ak+'_n';
-      const status=m.optional?'neutral':getStatus(av,tv,!!m.lowerBetter);
-      if(!m.optional){
-        total++;
-        if(status==='green') ontrack++;
-
-        // Collect summary data
-        const aNum=parseRaw(av), tNum=parseRaw(tv);
-        if(aNum!==null && tNum!==null && tNum!==0){
-          const pct=((aNum-tNum)/tNum*100);
-          // Cari nilai aktual periode sebelumnya dari historyData
-          const prevEntry=[...historyData].reverse().find(r=>
-            r.key===m.key && r.periodType===inputP
-          );
-          const prevNum=prevEntry?parseRaw(prevEntry.actual):null;
-          const prevPct=(aNum!==null&&prevNum!==null&&prevNum!==0)
-            ?((aNum-prevNum)/prevNum*100)
-            :null;
-          summaryParts.push({label:m.label, pct, prevPct, lowerBetter:!!m.lowerBetter, status});
-        }
-      }
-
-      // Hitung perubahan vs periode sebelumnya untuk kolom tabel
-      const aNumRow=parseRaw(av);
-      const prevEntryRow=[...historyData].reverse().find(r=>r.key===m.key&&r.periodType===inputP);
-      const prevNumRow=prevEntryRow?parseRaw(prevEntryRow.actual):null;
-      let prevCellHTML='<span style="font-size:11px;color:var(--tx3)">–</span>';
-      if(aNumRow!==null && prevNumRow!==null && prevNumRow!==0){
-        const pp=((aNumRow-prevNumRow)/prevNumRow*100);
-        const ppAbs=Math.abs(pp).toFixed(1);
-        const isUp=pp>0.5, isDown=pp<-0.5;
-        if(!isUp&&!isDown){
-          prevCellHTML='<span style="font-size:11px;color:var(--tx3)">±0%</span>';
-        } else {
-          // Warna: hijau = bagus, merah = buruk (sesuai lowerBetter)
-          const goodUp=!m.lowerBetter, goodDown=!!m.lowerBetter;
-          const color=isUp?(goodUp?'var(--green)':('var(--red)')):( goodDown?'var(--green)':('var(--red)'));
-          const arrow=isUp?'▲ +':'▼ -';
-          prevCellHTML='<span style="font-size:11px;font-weight:700;color:'+color+'">'+arrow+ppAbs+'%</span>';
-        }
-      }
-
-      rows+='<tr>'
-        +'<td><div class="metric-name">'+m.label
-        +(m.lowerBetter?' <span style="font-size:10px;color:#854F0B">(↓ lebih baik)</span>':'')
-        +'</div>'+(m.optional?'<div class="metric-opt">Opsional</div>':'')+'</td>'
-        +'<td class="r"><input class="e-input actual" type="text" value="'+av+'" data-key="'+ak+'" data-pic="'+pic.id+'" placeholder="'+getPlaceholder(m,'aktual')+'" oninput="updateActual(this)"/></td>'
-        +'<td class="r"><input class="e-input" type="text" value="'+tv+'" data-key="'+tk+'" data-pic="'+pic.id+'" placeholder="'+getPlaceholder(m,'target')+'" oninput="updateTarget(this)"/></td>'
-        +'<td class="c">'+tlPill(status)+'</td>'
-        +'<td class="c prev-cell">'+prevCellHTML+'</td>'
-        +'<td><textarea class="notes-input" rows="2" data-key="'+nk+'" placeholder="Tambahkan catatan (opsional)..." oninput="updateNotes(this)">'+nv+'</textarea></td>'
-        +'</tr>';
+      if(m.optional) return;
+      total++;
+      const av = getAvForCard(pic,m,pType,selLabel);
+      const tv = getTargetForPeriod(pic,m,pType);
+      if(getStatus(av,tv,!!m.lowerBetter)==='green') ontrack++;
     });
 
-    // Build summary sentence
-    const summaryHTML=buildSummaryHTML(summaryParts, pic.name, inputP);
-
-    const periodLabelDisp=inputP==='weekly'?'Weekly':'Monthly';
-    const isSubW=submitted[pic.id+'_weekly_'+getLastSubmittedPeriod(pic.id,'weekly')];
-    const isSubM=submitted[pic.id+'_monthly_'+getLastSubmittedPeriod(pic.id,'monthly')];
-
-    card.innerHTML=
-      '<div class="pic-card-hd">'
-        +'<div class="pic-animal" style="background:'+pic.abg+'">'+pic.animal+'</div>'
-        +'<div><div class="pic-name">'+pic.name+'</div><div class="pic-role">'+pic.role+'</div></div>'
-        +'<span class="pic-badge" style="'+pic.bstyle+'">'+pic.badge+'</span>'
-        +(isSub?'<span class="submitted-tag">✓ Submitted</span>':'')
-      +'</div>'
-      // Weekly / Monthly input tab switcher
-      +'<div style="display:flex;border-bottom:2px solid var(--border);background:#FAFAFE;">'
-        +'<button onclick="setPicInputPeriod(\''+pic.id+'\',\'weekly\')" style="flex:1;padding:8px 0;font-size:12px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;border-bottom:3px solid '+(inputP==='weekly'?'var(--p)':'transparent')+';color:'+(inputP==='weekly'?'var(--p)':'var(--tx3)')+';background:transparent;">'
-          +'📅 Weekly'+(isSubW?' <span style="font-size:10px;color:var(--green)">✓</span>':'')
-        +'</button>'
-        +'<button onclick="setPicInputPeriod(\''+pic.id+'\',\'monthly\')" style="flex:1;padding:8px 0;font-size:12px;font-weight:700;border:none;cursor:pointer;font-family:inherit;transition:all .2s;border-bottom:3px solid '+(inputP==='monthly'?'var(--p)':'transparent')+';color:'+(inputP==='monthly'?'var(--p)':'var(--tx3)')+';background:transparent;">'
-          +'📆 Monthly'+(isSubM?' <span style="font-size:10px;color:var(--green)">✓</span>':'')
-        +'</button>'
-      +'</div>'
-      +'<table class="kpi-table"><thead><tr>'
-        +'<th>Metrik <span style="font-weight:400;color:var(--tx3)">('+periodLabelDisp+')</span></th>'
-        +'<th class="r" style="color:#854F0B">Aktual <span style="font-weight:400">(bisa diedit)</span></th>'
-        +'<th class="r">Target <span style="font-weight:400">(bisa diedit)</span></th>'
-        +'<th class="c">Status</th>'
-        +'<th class="c" title="Perubahan aktual vs periode sebelumnya">vs Lalu</th>'
-        +'<th>Catatan</th>'
-      +'</tr></thead><tbody>'+rows+'</tbody></table>'
-      // Summary sentence
-      +summaryHTML
-      // Submit bar
-      +'<div class="submit-bar" style="flex-direction:column;gap:8px;align-items:stretch;">'
-        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
-          +'<span class="submit-info" style="flex:1">Simpan ke Histori KPI</span>'
-          +'<div style="display:flex;align-items:center;gap:6px;">'
-            +'<span style="font-size:11px;font-weight:600;color:var(--tx2)">Periode:</span>'
-            +'<select class="submit-label-sel" id="sel-label-'+pic.id+'" style="padding:5px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:12px;color:var(--tx);background:#fff;outline:none;cursor:pointer;min-width:120px;">'
-              +getPeriodOptions(inputP)
-            +'</select>'
-          +'</div>'
-          +'<button class="submit-btn'+(isSub?' done':'')+'" onclick="submitPIC(\''+pic.id+'\')" style="flex-shrink:0;">'
-            +(isSub?'✓ Re-submit':'📨 Submit ke Histori')
-          +'</button>'
-        +'</div>'
-      +'</div>';
-
+    const card = document.createElement('div');
+    card.className = 'pic-card';
+    card.innerHTML = buildCardHTML(pic, pType, selLabel, labelList, isPast, hasData, showForm);
     grid.appendChild(card);
   });
 
@@ -1221,8 +1201,226 @@ function renderCards(){
   updateSummary();
 }
 
-function setPicInputPeriod(picId, period){
-  picInputPeriod[picId]=period;
+// Ambil nilai aktual untuk suatu periodLabel — cek live state dulu, lalu histori, lalu default
+function getAvForCard(pic, m, pType, periodLabel){
+  const live_v = getLiveActualForLabel(m.key, pType, periodLabel);
+  if(live_v!==undefined) return live_v;
+  const hist = getHistoricActual(pic.id, m.key, periodLabel);
+  if(hist) return hist.actual;
+  return '–';
+}
+function getTvForCard(pic, m, pType, periodLabel){
+  const live_v = getLiveTargetForLabel(m.key, pType, periodLabel);
+  if(live_v!==undefined) return live_v;
+  const hist = getHistoricActual(pic.id, m.key, periodLabel);
+  if(hist) return hist.target;
+  return getTargetForPeriod(pic,m,pType);
+}
+function getNvForCard(pic, m, pType, periodLabel){
+  const live_v = getLiveNotesForLabel(m.key, pType, periodLabel);
+  if(live_v) return live_v;
+  const hist = getHistoricActual(pic.id, m.key, periodLabel);
+  return hist?hist.notes||'':'';
+}
+
+function buildCardHTML(pic, pType, selLabel, labelList, isPast, hasData, showForm){
+  const pLabel    = pType==='weekly'?'Weekly':'Monthly';
+  const curLabel  = pType==='weekly'?getCurrentWeekLabel():getCurrentMonthLabel();
+  const isCurrent = selLabel===curLabel;
+  const pid       = pic.id;
+
+  // Tab buttons
+  const tabs = ['weekly','monthly'].map(p=>{
+    const active = p===pType;
+    const lbl    = p==='weekly'?'📅 Weekly':'📆 Monthly';
+    return `<button onclick="setPicInputPeriod('${pid}','${p}')"
+      style="flex:1;padding:8px 0;font-size:12px;font-weight:700;border:none;cursor:pointer;
+      font-family:inherit;transition:all .2s;
+      border-bottom:3px solid ${active?'var(--p)':'transparent'};
+      color:${active?'var(--p)':'var(--tx3)'};background:transparent">${lbl}</button>`;
+  }).join('');
+
+  // Period dropdown options
+  const opts = labelList.map(l=>
+    `<option value="${l}"${l===selLabel?' selected':''}>${l}${l===curLabel?' (berjalan)':''}</option>`
+  ).join('');
+
+  // Period badge
+  const badge = isCurrent
+    ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--pl);color:var(--p)">Berjalan</span>`
+    : `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#F0EFF8;color:var(--tx2)">Periode lalu</span>`;
+
+  // Header
+  let out = `
+    <div class="pic-card-hd">
+      <div class="pic-animal" style="background:${pic.abg}">${pic.animal}</div>
+      <div><div class="pic-name">${pic.name}</div><div class="pic-role">${pic.role}</div></div>
+      <span class="pic-badge" style="${pic.bstyle}">${pic.badge}</span>
+      ${hasData?'<span class="submitted-tag">✓ Data tersedia</span>':''}
+    </div>
+    <div style="display:flex;border-bottom:2px solid var(--border);background:#FAFAFE">${tabs}</div>
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#F8F7FE;border-bottom:1px solid var(--border);flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:700;color:var(--tx2);white-space:nowrap">${pLabel}:</span>
+      <select onchange="onPeriodLabelChange('${pid}','${pType}',this.value)"
+        style="flex:1;min-width:160px;padding:5px 8px;border:1.5px solid var(--border);border-radius:8px;
+        font-size:12px;font-family:inherit;color:var(--tx);background:#fff;outline:none;cursor:pointer">
+        ${opts}
+      </select>
+      ${badge}
+    </div>`;
+
+  // Content
+  if(!hasData && !showForm){
+    out += `
+      <div style="padding:28px 20px;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">${isCurrent?'📝':'📂'}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--tx2);margin-bottom:4px">
+          ${isCurrent?'Belum ada data untuk minggu ini':'Belum ada data untuk periode ini'}</div>
+        <div style="font-size:12px;color:var(--tx3);margin-bottom:16px">
+          ${isCurrent?'Klik tombol di bawah untuk mulai mengisi KPI':'Data untuk periode ini belum pernah diisi'}</div>
+        <button onclick="openKpiForm('${pid}','${pType}','${selLabel}')"
+          style="background:var(--p);color:#fff;border:none;padding:9px 22px;border-radius:20px;
+          font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Isi KPI</button>
+      </div>`;
+  } else {
+    out += buildKpiTable(pic, pType, selLabel, showForm);
+    out += buildSummaryForCard(pic, pType, selLabel);
+    out += buildSubmitBar(pic, pType, selLabel, hasData, showForm);
+  }
+
+  return out;
+}
+
+function buildKpiTable(pic, pType, selLabel, showForm){
+  const curLabel  = pType==='weekly'?getCurrentWeekLabel():getCurrentMonthLabel();
+  const editable  = showForm || selLabel===curLabel;
+  const pid       = pic.id;
+
+  let rows = '';
+  pic.metrics.forEach(m=>{
+    const av  = getAvForCard(pic, m, pType, selLabel);
+    const tv  = getTvForCard(pic, m, pType, selLabel);
+    const nv  = getNvForCard(pic, m, pType, selLabel);
+    const ak  = m.key+'_'+pType+'_'+selLabel;
+    const status = m.optional?'neutral':getStatus(av,tv,!!m.lowerBetter);
+
+    // vs periode sebelumnya
+    const aNum  = parseRaw(av);
+    const prevE = getPrevEntry(pid, m.key, pType, selLabel);
+    const pNum  = prevE?parseRaw(prevE.actual):null;
+    let prevCell = `<span style="font-size:11px;color:var(--tx3)">–</span>`;
+    if(aNum!==null && pNum!==null && pNum!==0){
+      const pp = (aNum-pNum)/pNum*100;
+      if(Math.abs(pp)<=0.5){
+        prevCell = `<span style="font-size:11px;color:var(--tx3)">±0%</span>`;
+      } else {
+        const isUp  = pp>0;
+        const good  = isUp ? !m.lowerBetter : !!m.lowerBetter;
+        const color = good?'var(--green)':'var(--red)';
+        prevCell = `<span style="font-size:11px;font-weight:700;color:${color}">${isUp?'▲ +':'▼ -'}${Math.abs(pp).toFixed(1)}%</span>`;
+      }
+    }
+
+    const metricLabel = `${m.label}${m.lowerBetter?'<span style="font-size:10px;color:#854F0B"> (↓ lebih baik)</span>':''}`;
+    const optLabel    = m.optional?'<div class="metric-opt">Opsional</div>':'';
+
+    const actualCell = editable
+      ? `<td class="r"><input class="e-input actual" type="text" value="${av==='–'?'':av}"
+           data-key="${ak}" data-pic="${pid}" data-ptype="${pType}" data-plabel="${selLabel}"
+           placeholder="${getPlaceholder(m,'aktual')}" oninput="updateActualLabel(this)"/></td>`
+      : `<td class="r" style="font-size:13px;font-weight:600;color:var(--tx)">${av==='–'?'<span style="color:var(--tx3)">–</span>':av}</td>`;
+
+    const targetCell = editable
+      ? `<td class="r"><input class="e-input" type="text" value="${tv||''}"
+           data-key="${ak}_t" data-pic="${pid}" data-ptype="${pType}" data-plabel="${selLabel}"
+           placeholder="${getPlaceholder(m,'target')}" oninput="updateTargetLabel(this)"/></td>`
+      : `<td class="r" style="font-size:12px;color:var(--tx2)">${tv}</td>`;
+
+    const notesCell = editable
+      ? `<td><textarea class="notes-input" rows="2" data-key="${ak}_n"
+           placeholder="Tambahkan catatan (opsional)..." oninput="updateNotes(this)">${nv}</textarea></td>`
+      : `<td style="font-size:11px;color:var(--tx2)">${nv}</td>`;
+
+    rows += `<tr>
+      <td><div class="metric-name">${metricLabel}</div>${optLabel}</td>
+      ${actualCell}${targetCell}
+      <td class="c">${tlPill(status)}</td>
+      <td class="c prev-cell">${prevCell}</td>
+      ${notesCell}
+    </tr>`;
+  });
+
+  const editBtn = (!editable && isPastPeriod(selLabel,pType))
+    ? `<div style="padding:8px 14px;border-top:1px solid var(--border);text-align:right">
+        <button onclick="openKpiForm('${pid}','${pType}','${selLabel}')"
+          style="background:transparent;border:1.5px solid var(--p);color:var(--p);padding:5px 14px;
+          border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✏️ Edit Data</button>
+       </div>` : '';
+
+  return `<table class="kpi-table"><thead><tr>
+    <th>Metrik</th>
+    <th class="r" style="color:#854F0B">Aktual</th>
+    <th class="r">Target</th>
+    <th class="c">Status</th>
+    <th class="c" title="vs periode sebelumnya">vs Lalu</th>
+    <th>Catatan</th>
+  </tr></thead><tbody>${rows}</tbody></table>${editBtn}`;
+}
+
+function buildSummaryForCard(pic, pType, selLabel){
+  const parts=[];
+  pic.metrics.forEach(m=>{
+    if(m.optional) return;
+    const av=getAvForCard(pic,m,pType,selLabel);
+    const tv=getTvForCard(pic,m,pType,selLabel);
+    const aNum=parseRaw(av), tNum=parseRaw(tv);
+    if(aNum===null||tNum===null||tNum===0) return;
+    const pct=((aNum-tNum)/tNum*100);
+    const prevE=getPrevEntry(pic.id,m.key,pType,selLabel);
+    const prevNum=prevE?parseRaw(prevE.actual):null;
+    const prevPct=(prevNum&&prevNum!==0)?((aNum-prevNum)/prevNum*100):null;
+    parts.push({label:m.label, pct, prevPct, lowerBetter:!!m.lowerBetter});
+  });
+  return buildSummaryHTML(parts, pic.name, pType);
+}
+
+function buildSubmitBar(pic, pType, selLabel, hasData, showForm){
+  const isSaved = hasStoredData(pic.id, selLabel);
+  return `<div class="submit-bar" style="flex-direction:column;gap:8px;align-items:stretch">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="submit-info" style="flex:1;font-size:12px;color:var(--tx2)">
+        ${isSaved?'Re-submit akan menimpa data sebelumnya untuk periode ini':'Simpan ke Histori KPI'}
+      </span>
+      <button class="submit-btn${isSaved?' done':''}"
+        onclick="submitPICForLabel('${pic.id}','${pType}','${selLabel}')" style="flex-shrink:0">
+        ${isSaved?'✓ Perbarui Data':'📨 Simpan Data'}
+      </button>
+    </div>
+  </div>`;
+}
+
+function openKpiForm(picId, pType, periodLabel){
+  picShowForm[picId+'_'+pType+'_'+periodLabel]=true;
+  renderCards();
+  setTimeout(()=>{
+    const cards=document.querySelectorAll('.pic-card');
+    const idx=PICS.findIndex(p=>p.id===picId);
+    if(cards[idx]) cards[idx].scrollIntoView({behavior:'smooth',block:'nearest'});
+  },100);
+}
+
+function onPeriodLabelChange(picId, pType, newLabel){
+  picSelectedLabel[picId+'_'+pType]=newLabel;
+  // Reset form state when changing period
+  picShowForm[picId+'_'+pType+'_'+newLabel]=false;
+  renderCards();
+}
+
+function setPicInputPeriod(picId, pType){
+  picInputPeriod[picId]=pType;
+  // Reset ke periode berjalan saat ganti tab
+  const curLabel=pType==='weekly'?getCurrentWeekLabel():getCurrentMonthLabel();
+  picSelectedLabel[picId+'_'+pType]=curLabel;
   renderCards();
 }
 
@@ -1363,32 +1561,49 @@ function updateTarget(inp){
   updateStatusPill(inp);
   updateSummary();
 }
+// Label-aware versions for the new card system
+function updateActualLabel(inp){
+  live.actuals[inp.dataset.key]=inp.value;
+  updateStatusPill(inp);
+  updateSummary();
+}
+function updateTargetLabel(inp){
+  live.targets[inp.dataset.key]=inp.value;
+  updateStatusPill(inp);
+  updateSummary();
+}
 function updateNotes(ta){live.notes[ta.dataset.key]=ta.value;}
 
 function updateStatusPill(inp){
-  // Update only the status pill in the same row, without full re-render
-  const key=inp.dataset.key; // e.g. "seo_main_weekly"
-  const picId=inp.dataset.pic;
-  const pic=PICS.find(p=>p.id===picId);
-  if(!pic) return;
-  // Determine period from key suffix
-  const p=key.endsWith('_weekly')||key.replace(/_t$/,'').endsWith('_weekly')?'weekly':'monthly';
-  const mKey=key.replace('_'+p,'').replace('_t','');
-  const m=pic.metrics.find(x=>x.key===mKey);
+  // key format: metricKey_pType_periodLabel  or  metricKey_pType_periodLabel_t
+  const key    = inp.dataset.key;
+  const picId  = inp.dataset.pic;
+  const pType  = inp.dataset.ptype;
+  const pLabel = inp.dataset.plabel;
+  const pic    = PICS.find(p=>p.id===picId);
+  if(!pic||!pType||!pLabel) return;
+
+  // metricKey = key tanpa _pType_pLabel suffix (dan tanpa _t suffix)
+  const suffix  = '_'+pType+'_'+pLabel;
+  const baseKey = key.replace(suffix+'_t','').replace(suffix,'');
+  const m = pic.metrics.find(x=>x.key===baseKey);
   if(!m||m.optional) return;
-  const av=live.actuals[mKey+'_'+p]!==undefined?live.actuals[mKey+'_'+p]:m.actual[p];
-  const tv=live.targets[mKey+'_'+p+'_t']!==undefined?live.targets[mKey+'_'+p+'_t']:m.target[p];
-  const status=getStatus(av,tv,!!m.lowerBetter);
-  // Find pill in the same row as this input
-  const row=inp.closest('tr');
+
+  const akKey = baseKey+'_'+pType+'_'+pLabel;
+  const tkKey = akKey+'_t';
+  const av = live.actuals[akKey]!==undefined ? live.actuals[akKey] : m.actual[pType];
+  const tv = live.targets[tkKey]!==undefined ? live.targets[tkKey] : m.target[pType];
+  const status = getStatus(av,tv,!!m.lowerBetter);
+
+  const row = inp.closest('tr');
   if(row){
-    const pill=row.querySelector('.tl-pill');
+    const pill = row.querySelector('.tl-pill');
     if(pill){
-      const n=document.createElement('div');
-      n.innerHTML=tlPill(status);
-      const np=n.firstChild;
-      pill.className=np.className;
-      pill.textContent=np.textContent;
+      const n = document.createElement('div');
+      n.innerHTML = tlPill(status);
+      const np = n.firstChild;
+      pill.className  = np.className;
+      pill.textContent= np.textContent;
     }
   }
 }
@@ -1401,18 +1616,23 @@ function getNotes(m){return getNotesForPeriod(m,ui.period);}
 /* SUBMIT → HISTORY */
 // Period labels for submit dropdowns — generated dynamically
 function buildWeeklyLabels(){
-  // Semua minggu (Senin–Minggu) sejak awal 2026 sampai minggu terakhir yang selesai
-  const {mon:lastMon,sun:lastSun}=getLastCompletedMonday();
-  // Cari Senin pertama >= 1 Jan 2026
-  const startYear=new Date(2026,0,1); // 1 Jan 2026
-  const startDow=startYear.getDay(); // 0=Sun,1=Mon,...
+  // Semua minggu sejak awal 2026 sampai week BERJALAN (inklusif)
+  const startYear=new Date(2026,0,1);
+  const startDow=startYear.getDay();
   const daysToMon=startDow===1?0:(startDow===0?1:(8-startDow));
   const firstMon=new Date(startYear);
   firstMon.setDate(startYear.getDate()+daysToMon);
 
+  // Senin week berjalan (bukan last completed — bukan last completed)
+  const now=new Date();
+  const dow=now.getDay();
+  const currentMon=new Date(now);
+  currentMon.setDate(now.getDate()-(dow===0?6:dow-1));
+  currentMon.setHours(0,0,0,0);
+
   const labels=[];
   const cur=new Date(firstMon);
-  while(cur<=lastMon){
+  while(cur<=currentMon){
     const mon=new Date(cur);
     const sun=new Date(cur); sun.setDate(mon.getDate()+6);
     const monD=mon.getDate(), sunD=sun.getDate();
@@ -1429,12 +1649,11 @@ function buildWeeklyLabels(){
   return labels;
 }
 function buildMonthlyLabels(){
-  // Semua bulan sejak Jan 2026 sampai bulan lalu
+  // Semua bulan sejak Jan 2026 sampai bulan BERJALAN (inklusif)
   const now=new Date();
   const labels=[];
-  const start=new Date(2026,0,1); // Jan 2026
-  // Sampai bulan sebelumnya (bulan berjalan belum selesai)
-  const endMonth=new Date(now.getFullYear(),now.getMonth()-1,1);
+  const start=new Date(2026,0,1);
+  const endMonth=new Date(now.getFullYear(),now.getMonth(),1); // bulan berjalan
   const cur=new Date(start);
   while(cur<=endMonth){
     labels.push(ID_MONTHS[cur.getMonth()]+' '+cur.getFullYear());
@@ -1456,77 +1675,115 @@ function getPeriodOptions(currentPeriod){
 
 /* removed: syncLabelInput — no longer needed after per-card tab redesign */
 
-function submitPIC(picId){
+function submitPICForLabel(picId, pType, periodLabel){
   const pic=PICS.find(p=>p.id===picId);
   if(!pic) return;
 
-  // Use the active input tab period for this card
-  const pType=picInputPeriod[picId]||ui.period;
-  const pLabelSel=document.getElementById('sel-label-'+picId);
-  const periodLabel=pLabelSel?pLabelSel.value:(pType==='weekly'?'Mg 4, Mei':'Mei 2025');
+  // Cek apakah sudah ada data untuk periode ini
+  const alreadyHasData = historyData.some(r=>
+    r.pic_id===picId && r.periodType===pType && r.period===periodLabel
+  );
+  if(alreadyHasData && !window._confirmOverwrite){
+    // Tampilkan konfirmasi inline — tidak pakai confirm() yang bisa diblokir
+    showOverwriteConfirm(picId, pType, periodLabel, pic.name);
+    return;
+  }
+  window._confirmOverwrite = false; // reset flag
 
-  // Remove old entries for same pic+period+periodType (re-submit)
-  historyData=historyData.filter(r=>!(r.pic===pic.name&&r.periodType===pType&&r.period===periodLabel));
+  // Hapus entri lama lalu tulis ulang
+  historyData=historyData.filter(r=>!(r.pic_id===picId&&r.periodType===pType&&r.period===periodLabel));
 
+  let hasAny=false;
   pic.metrics.forEach(m=>{
     if(m.optional) return;
-    const av=getActualForPeriod(pic,m,pType);
-    const tv=getTargetForPeriod(pic,m,pType);
-    const nv=getNotesForPeriod(m,pType);
-    const last=[...historyData].reverse().find(r=>r.key===m.key&&r.periodType===pType);
-    const prev=last?parseRaw(last.actual):null;
+    const av=getAvForCard(pic,m,pType,periodLabel);
+    const tv=getTvForCard(pic,m,pType,periodLabel);
+    const nv=getNvForCard(pic,m,pType,periodLabel);
+    if(av==='–'&&tv==='–') return; // skip baris kosong
+    hasAny=true;
+    const prevE=getPrevEntry(picId,m.key,pType,periodLabel);
+    const prev=prevE?parseRaw(prevE.actual):null;
     historyData.push({
       id:++histId,
       period:periodLabel,
       periodType:pType,
       pic:pic.name,
+      pic_id:picId,
       role:pic.role,
       obj:m.label,
       key:m.key,
       actual:av,
       target:tv,
-      prev:prev,
+      prev,
       notes:nv,
       lowerBetter:!!m.lowerBetter,
       ts:new Date().toLocaleString('id-ID')
     });
   });
 
-  submitted[picId+'_'+pType+'_'+periodLabel]=true;
+  if(!hasAny){showToast('⚠️ Tidak ada data yang diisi.');return;}
+
+  // Tutup form setelah submit
+  picShowForm[picId+'_'+pType+'_'+periodLabel]=false;
   renderCards();
-  showToast('✅ Data '+pic.name+' ('+periodLabel+') disimpan...');
-  // Kirim ke Apps Script (Google Sheets)
-  syncSubmitToSheets(pic, pType, periodLabel);
+  showToast('✅ Data '+pic.name+' ('+periodLabel+') tersimpan!');
+  syncSubmitToSheetsLabel(pic, pType, periodLabel);
 }
 
-async function syncSubmitToSheets(pic, pType, periodLabel) {
-  try {
-    const entries = pic.metrics
-      .filter(m => !m.optional)
-      .map(m => ({
-        metric_key:   m.key,
-        metric_label: m.label,
-        actual:  getActualForPeriod(pic, m, pType),
-        target:  getTargetForPeriod(pic, m, pType),
-        notes:   getNotesForPeriod(m, pType)
-      }));
-    const res = await asPost({
-      action:       'submit_kpi',
-      pic_id:       pic.id,
-      pic_name:     pic.name,
-      period_type:  pType,
-      period_label: periodLabel,
-      entries:      entries
-    });
-    if (res.status === 'ok') {
-      showToast('✅ Data '+pic.name+' ('+periodLabel+') tersimpan ke Sheets!');
-    } else {
-      showToast('⚠️ Tersimpan lokal, gagal sync ke Sheets: '+(res.message||''));
-    }
-  } catch(e) {
-    showToast('⚠️ Tersimpan lokal, gagal sync ke Sheets. Cek koneksi.');
-  }
+function showOverwriteConfirm(picId, pType, periodLabel, picName){
+  // Buat overlay konfirmasi inline (tidak pakai confirm() browser)
+  const existing = document.getElementById('overwrite-confirm');
+  if(existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'overwrite-confirm';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;'
+    +'display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:28px 24px;max-width:380px;width:100%;
+      box-shadow:0 8px 40px rgba(0,0,0,.18);text-align:center">
+      <div style="font-size:36px;margin-bottom:12px">⚠️</div>
+      <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:8px">Perbarui Data?</div>
+      <div style="font-size:13px;color:var(--tx2);margin-bottom:22px;line-height:1.6">
+        Sudah ada data <strong>${picName}</strong> untuk periode<br>
+        <strong>${periodLabel}</strong>.<br>
+        Data lama akan ditimpa dengan data baru.
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button onclick="document.getElementById('overwrite-confirm').remove()"
+          style="padding:9px 22px;border:1.5px solid var(--border);border-radius:10px;
+          background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--tx2)">
+          Batal
+        </button>
+        <button onclick="window._confirmOverwrite=true;document.getElementById('overwrite-confirm').remove();submitPICForLabel('${picId}','${pType}','${periodLabel}')"
+          style="padding:9px 22px;background:var(--p);color:#fff;border:none;border-radius:10px;
+          font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+          Ya, Perbarui
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
 }
+
+async function syncSubmitToSheetsLabel(pic, pType, periodLabel){
+  try{
+    const entries=pic.metrics.filter(m=>!m.optional).map(m=>({
+      metric_key:   m.key,
+      metric_label: m.label,
+      actual:  getAvForCard(pic,m,pType,periodLabel),
+      target:  getTvForCard(pic,m,pType,periodLabel),
+      notes:   getNvForCard(pic,m,pType,periodLabel)
+    }));
+    const res=await asPost({action:'submit_kpi',pic_id:pic.id,pic_name:pic.name,
+      period_type:pType,period_label:periodLabel,entries});
+    if(res.status==='ok') showToast('✅ Data tersimpan ke Sheets!');
+    else showToast('⚠️ Lokal tersimpan, gagal sync: '+(res.message||''));
+  }catch(e){showToast('⚠️ Lokal tersimpan, gagal sync ke Sheets.');}
+}
+
+/* submitPIC (legacy) removed — use submitPICForLabel */
+
+/* syncSubmitToSheets (legacy) removed — use syncSubmitToSheetsLabel */
 
 /* PERIOD / TREND */
 function setPeriod(p){
@@ -1535,7 +1792,7 @@ function setPeriod(p){
   PICS.forEach(pic=>{ picInputPeriod[pic.id]=p; });
   document.getElementById('btn-weekly').classList.toggle('active',p==='weekly');
   document.getElementById('btn-monthly').classList.toggle('active',p==='monthly');
-  document.getElementById('period-range').textContent=p==='weekly'?getWeeklyRangeLabel():getMonthlyLabel();
+  document.getElementById('period-range').textContent=p==='weekly'?(getCurrentWeekLabel()+' (berjalan)'):getCurrentMonthLabel();
   renderCards();drawTrend();
 }
 function setTrend(t){
@@ -1589,48 +1846,59 @@ function exportCSV(){
 
 /* LOAD HISTORY FROM SHEETS */
 async function loadHistoryFromSheets() {
-  // Tampilkan loading state di tabel
-  const tbody = document.getElementById('hist-tbody');
-  if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--tx3)">⏳ Memuat data dari server...</td></tr>';
-  renderHistory(); // render summary cards dulu dari data lokal
+  // Render dulu dari data lokal yang ada (termasuk kartu dashboard)
+  renderHistory();
+  renderCards();
 
   try {
-    const res = await asGet({ action: 'load_entries', period_type: ui.histPeriod });
+    const res = await asGet({ action: 'load_entries' }); // load semua, tanpa filter period_type
     if (res.status === 'ok' && res.data && res.data.length > 0) {
       // Merge data dari Sheets ke historyData lokal
       // Hindari duplikat berdasarkan pic_id + period_label + metric_key
       res.data.forEach(row => {
-        const exists = historyData.some(h =>
+        // Overwrite jika sudah ada (pic+period+metric sama)
+        const existsIdx = historyData.findIndex(h =>
           h.pic    === row.pic_name &&
           h.period === row.period_label &&
           h.key    === row.metric_key
         );
-        if (!exists) {
-          historyData.push({
-            id:          ++histId,
-            period:      row.period_label,
-            periodType:  row.period_type,
-            pic:         row.pic_name,
-            role:        '', // tidak tersimpan di Sheets, isi dari PICS
-            obj:         row.metric_label,
-            key:         row.metric_key,
-            actual:      row.actual,
-            target:      row.target,
-            prev:        null,
-            notes:       row.notes || '',
-            lowerBetter: false,
-            ts:          row.timestamp
-          });
+        const hPic = PICS.find(p=>p.name===row.pic_name);
+        const hM   = hPic?hPic.metrics.find(x=>x.key===row.metric_key):null;
+        const entry = {
+          id:          existsIdx>=0 ? historyData[existsIdx].id : ++histId,
+          period:      row.period_label,
+          periodType:  row.period_type,
+          pic:         row.pic_name,
+          pic_id:      hPic?hPic.id:(row.pic_id||''),
+          role:        hPic?hPic.role:'',
+          obj:         row.metric_label,
+          key:         row.metric_key,
+          actual:      row.actual,
+          target:      row.target,
+          prev:        null,
+          notes:       row.notes || '',
+          lowerBetter: hM?!!hM.lowerBetter:false,
+          ts:          row.timestamp
+        };
+        if(existsIdx>=0){
+          historyData[existsIdx]=entry; // overwrite
+        } else {
+          historyData.push(entry);
         }
       });
-      // Isi role dari PICS master data
-      historyData.forEach(h => {
-        if (!h.role) {
-          const pic = PICS.find(p => p.name === h.pic);
-          if (pic) h.role = pic.role;
-          const m = pic ? pic.metrics.find(x => x.key === h.key) : null;
-          if (m) h.lowerBetter = !!m.lowerBetter;
-        }
+      // Sort historyData by period chronologically agar getPrevEntry akurat
+      // Format label: "D-D Mon YYYY" atau "D Mon-D Mon YYYY"
+      historyData.sort((a,b)=>{
+        // Ambil tahun dan tanggal pertama dari label
+        const parseLabel=l=>{
+          const y=parseInt((l.match(/\d{4}/)||['0'])[0]);
+          const d=parseInt((l.match(/^\d+/)||['0'])[0]);
+          const mIdx=ID_MONTHS.findIndex(m=>l.includes(m));
+          return y*10000+(mIdx>=0?mIdx:0)*100+d;
+        };
+        const da=parseLabel(a.period), db=parseLabel(b.period);
+        if(da!==db) return da-db;
+        return a.key.localeCompare(b.key);
       });
     }
   } catch(e) {
@@ -1638,6 +1906,8 @@ async function loadHistoryFromSheets() {
     console.warn('Gagal load dari Sheets:', e.message);
   }
   renderHistory();
+  // Re-render kartu KPI agar data prevEntry dan hasStoredData terupdate
+  renderCards();
 }
 
 /* HISTORY RENDER */
@@ -1826,6 +2096,7 @@ function switchTab(tab){
     document.getElementById('mtab-'+t).classList.toggle('active',t===tab);
   });
   if(tab==='history')  { loadHistoryFromSheets(); }
+  if(tab==='dashboard'){ renderCards(); }
   if(tab==='settings') renderSettings();
 }
 
@@ -2123,7 +2394,7 @@ function rebuildForecastMetricSelect(){
   });
 }
 /* INIT */
-function init(){
+async function init(){
   // Stamp type field onto PICS metrics if not present
   PICS.forEach(pic=>pic.metrics.forEach(m=>{ if(!m.type) m.type=inferType(m); }));
   // Re-sync settingsData
@@ -2138,14 +2409,30 @@ function init(){
       targetMonthly:m.target.monthly||''
     }))
   }));
+  // Set dynamic date labels
+  document.getElementById('period-range').textContent=getCurrentWeekLabel()+' (berjalan)';
+  document.getElementById('update-date').textContent=getTodayLabel();
+  // Load history dari Sheets dulu agar getPrevEntry bisa bekerja
+  await loadHistoryFromSheets();
   renderCards();
   drawTrend();
   rebuildForecastMetricSelect();
-  // Set dynamic date labels
-  document.getElementById('period-range').textContent=getWeeklyRangeLabel();
-  document.getElementById('update-date').textContent=getTodayLabel();
 }
 // init() dipanggil dari showDashboard() setelah login berhasil
+
+// Refresh label list saat user kembali ke tab (handles date change overnight)
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState==='visible' && authToken){
+    // Rebuild label lists (tanggal mungkin berubah)
+    WEEKLY_LABELS  = buildWeeklyLabels();
+    MONTHLY_LABELS = buildMonthlyLabels();
+    // Update period-range di topbar
+    const pr = document.getElementById('period-range');
+    if(pr) pr.textContent = getCurrentWeekLabel()+' (berjalan)';
+    const ud = document.getElementById('update-date');
+    if(ud) ud.textContent = getTodayLabel();
+  }
+});
 let forecastChart=null;
 let lastFcResult=null;
 
