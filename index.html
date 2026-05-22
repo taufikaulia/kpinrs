@@ -1010,25 +1010,15 @@ let trendChart=null;
 
 /* DASHBOARD CONFIG — dikontrol dari Settings */
 let dashboardConfig = {
-  // Kategori yang muncul di Summary Cards (maks 4)
-  summaryCards: [
-    {id:'card_ontrack', label:'KPI On Track',   type:'ontrack',  category:'',      enabled:true},
-    {id:'card_revenue', label:'Revenue',         type:'category', category:'Revenue',enabled:true},
-    {id:'card_traffic', label:'Traffic',          type:'category', category:'Traffic',enabled:true},
-    {id:'card_product', label:'Campaign Delivered',type:'metric', metricKey:'pm_camp',picId:'taufik',enabled:true},
-  ],
-  // Tab grafik tren — tiap tab punya nama + list metrik yang di-plot
-  trendTabs: [
-    {id:'traffic', label:'Traffic',  metrics:['seo_main','seo_sub','wm_vmain'], enabled:true},
-    {id:'revenue', label:'Revenue',  metrics:['gr_rev1','gr_rev2','gr_rev3','wm_rev'], enabled:true},
-    {id:'ads',     label:'Ads',      metrics:['ads_spend'], enabled:true},
-  ],
+  // Metrik utama yang ditampilkan di overview cards DAN grafik tren
+  // Default kosong — user harus pilih sendiri
+  featuredMetrics: [],
   // Filter waktu overview
   timeFilter: {
-    periodType: 'weekly',   // 'weekly' | 'monthly'
-    preset: 'last8',        // 'last4'|'last8'|'last12'|'custom'
-    from: '',               // label periode awal (kalau custom)
-    to:   '',               // label periode akhir (kalau custom)
+    periodType: 'weekly',
+    preset: 'last8',
+    from: '',
+    to:   '',
   }
 };
 
@@ -1175,6 +1165,258 @@ const TREND={
     ]}
   }
 };
+
+/* ============================================================
+   UTILITY FUNCTIONS
+   ============================================================ */
+
+function showToast(msg, dur=3000){
+  const t=document.getElementById('toast');
+  if(!t) return;
+  t.textContent=msg; t.style.display='block';
+  clearTimeout(t._to);
+  t._to=setTimeout(()=>{ t.style.display='none'; }, dur);
+}
+
+function today(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function dlCSV(content, filename){
+  const blob=new Blob([content],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportCSV(){
+  const p=ui.period;
+  let csv='KPI Dashboard Narasi.tv\n\n';
+  csv+='PIC,Role,Metrik,Aktual,Target,Status,Catatan\n';
+  PICS.forEach(pic=>{
+    const cp=picInputPeriod[pic.id]||p;
+    pic.metrics.forEach(m=>{
+      const av=getAvForCard(pic,m,cp,picSelectedLabel[pic.id+'_'+cp]||getCurrentWeekLabel());
+      const tv=getTvForCard(pic,m,cp,picSelectedLabel[pic.id+'_'+cp]||getCurrentWeekLabel());
+      const status=m.optional?'opsional':getStatus(av,tv,!!m.lowerBetter);
+      const notes=(live.notes[m.key+'_'+cp+'_n']||'').replace(/\n/g,' ');
+      csv+=pic.name+','+pic.role+',"'+m.label+'","'+av+'","'+tv+'",'+status+',"'+notes+'"\n';
+    });
+  });
+  dlCSV(csv,'narasi_kpi_'+today()+'.csv');
+  showToast('✅ CSV berhasil diunduh!');
+}
+
+/* ============================================================
+   LOAD HISTORY FROM SHEETS
+   ============================================================ */
+
+async function loadHistoryFromSheets(){
+  const tbody=document.getElementById('hist-tbody');
+  if(tbody) tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--tx3)">⏳ Memuat data dari server...</td></tr>';
+
+  try{
+    const res=await asGet({action:'load_entries'});
+    if(res.status==='ok' && res.data && res.data.length>0){
+      res.data.forEach(row=>{
+        const existsIdx=historyData.findIndex(h=>
+          h.pic===row.pic_name && h.period===row.period_label && h.key===row.metric_key
+        );
+        const hPic=PICS.find(p=>p.name===row.pic_name);
+        const hM=hPic?hPic.metrics.find(x=>x.key===row.metric_key):null;
+        const entry={
+          id:          existsIdx>=0?historyData[existsIdx].id:++histId,
+          period:      row.period_label,
+          periodType:  row.period_type,
+          pic:         row.pic_name,
+          pic_id:      hPic?hPic.id:(row.pic_id||''),
+          role:        hPic?hPic.role:'',
+          obj:         row.metric_label,
+          key:         row.metric_key,
+          actual:      row.actual,
+          target:      row.target,
+          prev:        null,
+          notes:       row.notes||'',
+          lowerBetter: hM?!!hM.lowerBetter:false,
+          ts:          row.timestamp
+        };
+        if(existsIdx>=0) historyData[existsIdx]=entry;
+        else historyData.push(entry);
+      });
+      historyData.sort((a,b)=>{
+        const da=parsePeriodLabel(a.period), db=parsePeriodLabel(b.period);
+        if(da!==db) return da-db;
+        return a.key.localeCompare(b.key);
+      });
+    }
+  } catch(e){
+    console.warn('Gagal load dari Sheets:',e.message);
+  }
+  renderHistory();
+  if(document.getElementById('pic-grid')?.children.length>0) renderCards();
+}
+
+/* ============================================================
+   HISTORY RENDER
+   ============================================================ */
+
+function renderHistory(){
+  // Filter data
+  let data=[...historyData];
+  if(ui.histPeriod)   data=data.filter(r=>r.periodType===ui.histPeriod);
+  if(ui.filterPeriod) data=data.filter(r=>r.period===ui.filterPeriod);
+  if(ui.filterPic)    data=data.filter(r=>r.pic===ui.filterPic);
+
+  // Summary stats
+  let totRev=0,totTraffic=0,totEntries=data.length,ontrackCount=0;
+  data.forEach(r=>{
+    const m=PICS.flatMap(p=>p.metrics).find(x=>x.key===r.key);
+    if(m?.category==='Revenue') totRev+=parseRaw(r.actual)||0;
+    if(m?.category==='Traffic') totTraffic+=parseRaw(r.actual)||0;
+    if(getStatus(r.actual,r.target,!!r.lowerBetter)==='green') ontrackCount++;
+  });
+  const pct=totEntries>0?Math.round(ontrackCount/totEntries*100):0;
+  const setStat=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  setStat('hs-entries', totEntries);
+  setStat('hs-ontrack', pct+'%');
+  setStat('hs-revenue', totRev>0?'Rp '+(totRev/1000000).toFixed(1)+' Jt':'–');
+  setStat('hs-traffic', totTraffic>0?(totTraffic/1000).toFixed(0)+' Rb':'–');
+
+  // Group by period
+  const groups={};
+  data.forEach(r=>{
+    if(!groups[r.period]) groups[r.period]=[];
+    groups[r.period].push(r);
+  });
+
+  const tbody=document.getElementById('hist-tbody');
+  if(!tbody) return;
+  if(!data.length){
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--tx3)">Belum ada data histori.</td></tr>';
+    return;
+  }
+
+  let html='';
+  // Sort periods descending
+  const periods=Object.keys(groups).sort((a,b)=>parsePeriodLabel(b)-parsePeriodLabel(a));
+  periods.forEach(period=>{
+    const rows=groups[period];
+    html+=`<tr><td colspan="7" class="hist-period-hd">
+      <span class="hist-period-lbl">${period}</span>
+      <span class="hist-period-cnt">${rows.length} metrik</span>
+    </td></tr>`;
+    rows.forEach((r,i)=>{
+      const bg=i%2===0?'#fff':'#FAFAFE';
+      const ps=PIC_STYLES[r.pic]||{animal:'👤',bg:'#F0EFF8',color:'#534AB7'};
+      const rs=ROLE_COLORS[r.role]||'background:#F0EFF8;color:#534AB7;';
+      const status=getStatus(r.actual,r.target,!!r.lowerBetter);
+      const g=calcGrowth(r.actual,r.prev);
+      let gb;
+      if(g===null) gb='<span class="gbadge zero">–</span>';
+      else if(g>0.5) gb='<span class="gbadge pos">▲ +'+Math.abs(g).toFixed(1)+'%</span>';
+      else if(g<-0.5) gb='<span class="gbadge neg">▼ -'+Math.abs(g).toFixed(1)+'%</span>';
+      else gb='<span class="gbadge zero">≈ 0%</span>';
+      html+=`<tr style="background:${bg}">
+        <td><div class="pic-chip" style="background:${ps.bg};color:${ps.color}">${ps.animal} ${r.pic}</div>
+            <div class="role-badge" style="${rs}">${r.role}</div></td>
+        <td><div class="obj-text">${r.obj||r.key}</div></td>
+        <td class="r"><span class="val-actual">${r.actual||'–'}</span></td>
+        <td class="r"><span class="val-target">${r.target||'–'}</span></td>
+        <td class="c">${tlPill(status)}</td>
+        <td class="c">${gb}</td>
+        <td class="c">
+          <button class="edit-btn" onclick="openEditModal(${r.id})">✏</button>
+          <button class="del-btn" onclick="deleteRow(${r.id})">✕</button>
+        </td>
+      </tr>`;
+    });
+  });
+  tbody.innerHTML=html;
+
+  // Populate filter dropdowns
+  const periods2=[...new Set(historyData.map(r=>r.period))].sort((a,b)=>parsePeriodLabel(b)-parsePeriodLabel(a));
+  const pics=[...new Set(historyData.map(r=>r.pic))].sort();
+  const fperiod=document.getElementById('filter-period');
+  const fpic=document.getElementById('filter-pic');
+  if(fperiod) fperiod.innerHTML='<option value="">Semua Periode</option>'+periods2.map(p=>`<option value="${p}"${ui.filterPeriod===p?' selected':''}>${p}</option>`).join('');
+  if(fpic) fpic.innerHTML='<option value="">Semua PIC</option>'+pics.map(p=>`<option value="${p}"${ui.filterPic===p?' selected':''}>${p}</option>`).join('');
+}
+
+function deleteRow(id){
+  const row=historyData.find(r=>r.id===id);
+  historyData=historyData.filter(r=>r.id!==id);
+  renderHistory();
+  showToast('🗑 Data dihapus dari histori.');
+  if(row&&row.sheets_id){
+    asPost({action:'delete_entry',id:row.sheets_id}).catch(()=>{});
+  }
+}
+
+/* ============================================================
+   EDIT MODAL — Histori KPI
+   ============================================================ */
+
+let _editingId = null;
+
+function openEditModal(id){
+  const r = historyData.find(x=>x.id===id);
+  if(!r) return;
+  _editingId = id;
+  document.getElementById('modal-title').textContent = 'Edit Data: '+r.obj;
+  document.getElementById('modal-sub').textContent   = r.pic+' · '+r.period;
+  document.getElementById('modal-period').value  = r.period  || '';
+  document.getElementById('modal-actual').value  = r.actual  || '';
+  document.getElementById('modal-target').value  = r.target  || '';
+  document.getElementById('modal-prev').value    = r.prev!==null && r.prev!==undefined ? r.prev : '';
+  document.getElementById('modal-notes').value   = r.notes   || '';
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeModal(){
+  document.getElementById('edit-modal').style.display = 'none';
+  _editingId = null;
+}
+
+function saveModal(){
+  if(_editingId===null) return;
+  const r = historyData.find(x=>x.id===_editingId);
+  if(!r){ closeModal(); return; }
+
+  r.period  = document.getElementById('modal-period').value.trim() || r.period;
+  r.actual  = document.getElementById('modal-actual').value.trim();
+  r.target  = document.getElementById('modal-target').value.trim();
+  const prevRaw = document.getElementById('modal-prev').value.trim();
+  r.prev    = prevRaw!=='' ? parseFloat(prevRaw.replace(/[^0-9.]/g,'')) : null;
+  r.notes   = document.getElementById('modal-notes').value.trim();
+
+  // Re-sort after period label might have changed
+  historyData.sort((a,b)=>{
+    const da=parsePeriodLabel(a.period), db=parsePeriodLabel(b.period);
+    if(da!==db) return da-db;
+    return a.key.localeCompare(b.key);
+  });
+
+  closeModal();
+  renderHistory();
+  showToast('✅ Data histori diperbarui.');
+
+  // Sync to Sheets if entry has sheets ID
+  if(r.sheets_id){
+    asPost({
+      action:'update_entry', id:r.sheets_id,
+      actual:r.actual, target:r.target, notes:r.notes, period_label:r.period
+    }).catch(()=>{});
+  }
+}
+
+// Close modal on overlay click
+document.addEventListener('click', function(e){
+  const modal = document.getElementById('edit-modal');
+  if(e.target === modal) closeModal();
+});
+
 
 /* RENDER DASHBOARD */
 // Per-PIC UI state
@@ -1932,25 +2174,176 @@ function setPeriod(p){
   renderCards();renderOverview();
 }
 function setTrend(t){
-  ui.trend=t;
-  // Update active state pada semua tab yang ada (dynamic)
-  document.querySelectorAll('.trend-tab').forEach(btn=>{
-    btn.classList.toggle('active', btn.id==='ttab-'+t);
-  });
+  // Tab grafik dihapus — grafik kini multi-line dari featuredMetrics
+  // Fungsi ini dipertahankan agar tidak error jika masih terpanggil
   drawTrend();
 }
 /* drawTrend legacy removed — see drawTrend below */
+/* ============================================================
+   OVERVIEW RENDER FUNCTIONS
+   ============================================================ */
+
+function renderOverview(){
+  renderSummaryCards();
+  drawTrend();
+  updateOverviewRangeLabel();
+}
+
+function renderSummaryCards(){
+  const grid = document.getElementById('sum-grid-dynamic');
+  if(!grid) return;
+  const pType    = dashboardConfig.timeFilter.periodType;
+  const periods  = getOverviewPeriodList();
+  const curLabel = periods[periods.length-1] || '';
+  const fm       = dashboardConfig.featuredMetrics;
+
+  // Card 1: selalu KPI On Track
+  let ontrack=0, total=0;
+  PICS.forEach(pic=>pic.metrics.forEach(m=>{
+    if(m.optional) return; total++;
+    const av=getAvForCard(pic,m,pType,curLabel);
+    const tv=getTvForCard(pic,m,pType,curLabel);
+    if(getStatus(av,tv,!!m.lowerBetter)==='green') ontrack++;
+  }));
+
+  // Empty state jika tidak ada featured metrics
+  if(fm.length===0){
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--tx3);font-size:13px">
+      <div style="font-size:28px;margin-bottom:8px">📊</div>
+      Pilih metrik di <strong style="color:var(--p)">Pengaturan → Konfigurasi Dashboard</strong>
+    </div>`;
+    return;
+  }
+
+  const cards = [{
+    cls:'pu', lbl:'KPI On Track',
+    val: total>0 ? ontrack+' / '+total : '–',
+    sub: total>0 ? 'metrik on track periode ini' : 'belum ada data'
+  }];
+
+  fm.slice(0,3).forEach((fk,i)=>{
+    let pic=null, m=null;
+    PICS.forEach(p=>{ const found=p.metrics.find(x=>x.key===fk); if(found){pic=p;m=found;} });
+    if(!pic||!m){ cards.push({cls:i%2===0?'ye':'pu',lbl:fk,val:'–',sub:'Metrik tidak ditemukan'}); return; }
+    const av = getAvForCard(pic,m,pType,curLabel);
+    const hasData = av && av!=='–' && av!=='';
+    cards.push({
+      cls: i%2===0?'ye':'pu',
+      lbl: m.label,
+      val: hasData ? av : '–',
+      sub: hasData ? pic.name+' · '+curLabel : 'Belum ada data untuk periode ini'
+    });
+  });
+
+  const colors=['pu','ye','pu','ye'];
+  grid.innerHTML = cards.map((c,i)=>`
+    <div class="sum-card ${c.cls||colors[i%4]}">
+      <div class="sum-lbl">${c.lbl}</div>
+      <div class="sum-val">${c.val}</div>
+      <div class="sum-sub">${c.sub}</div>
+    </div>`).join('');
+}
+
+function renderTrendTabs(){
+  // Tab grafik dihapus — grafik kini multi-line dari featuredMetrics
+  const container = document.getElementById('trend-tabs-dynamic');
+  if(container) container.innerHTML='';
+}
+
+function updateOverviewRangeLabel(){
+  const list = getOverviewPeriodList();
+  const el = document.getElementById('ovf-range-label');
+  if(el && list.length) el.textContent = list[0]+' → '+list[list.length-1];
+}
+
+/* ============================================================
+   OVERVIEW FILTER FUNCTIONS
+   ============================================================ */
+
+function getOverviewPeriodList(){
+  const cfg  = dashboardConfig.timeFilter;
+  const all  = cfg.periodType==='weekly'
+    ? (WEEKLY_LABELS.length  ? WEEKLY_LABELS  : buildWeeklyLabels())
+    : (MONTHLY_LABELS.length ? MONTHLY_LABELS : buildMonthlyLabels());
+  if(cfg.preset==='custom' && cfg.from && cfg.to){
+    const fi=all.indexOf(cfg.from), ti=all.indexOf(cfg.to);
+    if(fi>=0 && ti>=0 && ti>=fi) return all.slice(fi,ti+1);
+  }
+  const n = cfg.preset==='last4'?4 : cfg.preset==='last12'?12 : 8;
+  return all.slice(-n);
+}
+
+function setOverviewPeriod(p){
+  dashboardConfig.timeFilter.periodType = p;
+  document.getElementById('ovf-weekly').classList.toggle('active',p==='weekly');
+  document.getElementById('ovf-monthly').classList.toggle('active',p==='monthly');
+  updateCustomOverviewDropdowns();
+  renderOverview();
+}
+
+function setOverviewPreset(v){
+  dashboardConfig.timeFilter.preset = v;
+  const customEl = document.getElementById('ovf-custom');
+  if(customEl) customEl.style.display = v==='custom'?'flex':'none';
+  if(v==='custom') updateCustomOverviewDropdowns();
+  else renderOverview();
+}
+
+function updateCustomOverviewDropdowns(){
+  const cfg  = dashboardConfig.timeFilter;
+  const all  = cfg.periodType==='weekly' ? buildWeeklyLabels() : buildMonthlyLabels();
+  const fromSel = document.getElementById('ovf-from');
+  const toSel   = document.getElementById('ovf-to');
+  if(!fromSel||!toSel) return;
+  const opts = all.map(l=>`<option value="${l}">${l}</option>`).join('');
+  fromSel.innerHTML = opts;
+  toSel.innerHTML   = opts;
+  fromSel.value = all[Math.max(0,all.length-8)];
+  toSel.value   = all[all.length-1];
+  cfg.from = fromSel.value;
+  cfg.to   = toSel.value;
+}
+
+function applyCustomOverviewFilter(){
+  const f = document.getElementById('ovf-from');
+  const t = document.getElementById('ovf-to');
+  if(!f||!t) return;
+  dashboardConfig.timeFilter.from = f.value;
+  dashboardConfig.timeFilter.to   = t.value;
+  renderOverview();
+}
+
+
 function drawTrend(){
-  const tab    = dashboardConfig.trendTabs.find(t=>t.id===ui.trend);
-  if(!tab) return;
   const pType  = dashboardConfig.timeFilter.periodType;
   const labels = getOverviewPeriodList();
 
-  // Kumpulkan data series per metrik yang ada di tab ini
+  const fm = dashboardConfig.featuredMetrics;
+  // Empty state jika tidak ada featured metrics
+  if(!fm.length){
+    if(trendChart){ trendChart.destroy(); trendChart=null; }
+    const canvas = document.getElementById('trendChart');
+    const legend = document.getElementById('trend-legend');
+    if(legend) legend.innerHTML='';
+    if(canvas){
+      const ctx=canvas.getContext('2d');
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+    }
+    const wrap=canvas?canvas.parentElement:null;
+    if(wrap) wrap.insertAdjacentHTML('afterend',
+      wrap.nextElementSibling?.dataset?.emptyTrend?'':
+      `<div data-empty-trend="1" style="text-align:center;padding:20px;color:var(--tx3);font-size:12px">
+        Pilih metrik di <strong style="color:var(--p)">Pengaturan → Konfigurasi Dashboard</strong> untuk menampilkan grafik.
+      </div>`);
+    return;
+  }
+  // Hapus empty state jika ada
+  document.querySelectorAll('[data-empty-trend]').forEach(el=>el.remove());
+
   const COLORS = ['#534AB7','#EF9F27','#0F9E6F','#E03E3E','#185FA5','#993C1D'];
   const datasets = [];
 
-  tab.metrics.forEach((mKey,ci)=>{
+  fm.forEach((mKey,ci)=>{
     let metricMeta = null, picForMetric = null;
     PICS.forEach(pic=>{
       const m = pic.metrics.find(x=>x.key===mKey);
@@ -2047,142 +2440,87 @@ function renderDashConfig(){
   const el = document.getElementById('dash-config-content');
   if(!el) return;
 
-  // Kumpulkan semua kategori unik dari PICS
-  const allCats = [...new Set(
-    PICS.flatMap(p=>p.metrics.map(m=>m.category||'').filter(Boolean))
-  )].sort();
-  // Kumpulkan semua metrik flat
+  const fm = dashboardConfig.featuredMetrics;
   const allMetrics = PICS.flatMap(p=>p.metrics.filter(m=>!m.optional).map(m=>({
-    key:m.key, label:m.label, category:m.category, picName:p.name
+    key:m.key, label:m.label, category:m.category||'', picName:p.name, picId:p.id
   })));
 
-  // ── Summary Cards config ──
-  const cardRows = dashboardConfig.summaryCards.map((card,i)=>{
-    const typeOpts = ['ontrack','category','metric'].map(t=>
-      `<option value="${t}"${card.type===t?' selected':''}>${
-        t==='ontrack'?'KPI On Track':t==='category'?'Jumlah Kategori':'Metrik Spesifik'
-      }</option>`
-    ).join('');
-
-    let extraOpts = '';
-    if(card.type==='category'){
-      extraOpts = `<select onchange="updateCardConfig(${i},'category',this.value)"
-        style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;background:#fff;outline:none">
-        ${allCats.map(c=>`<option value="${c}"${card.category===c?' selected':''}>${c}</option>`).join('')}
-      </select>`;
-    } else if(card.type==='metric'){
-      extraOpts = `<select onchange="updateCardMetricConfig(${i},this.value)"
-        style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;background:#fff;outline:none">
-        ${allMetrics.map(m=>`<option value="${m.key}|${PICS.find(p=>p.metrics.find(x=>x.key===m.key))?.id||''}"${card.metricKey===m.key?' selected':''}>${m.picName} — ${m.label}</option>`).join('')}
-      </select>`;
-    }
-
-    return `<div class="dc-row">
-      <input type="checkbox" class="dc-chk" ${card.enabled?'checked':''} onchange="updateCardConfig(${i},'enabled',this.checked)">
-      <input class="s-inp" type="text" value="${card.label}" style="flex:1;max-width:180px"
-        oninput="updateCardConfig(${i},'label',this.value)" placeholder="Nama kartu">
-      <select onchange="updateCardConfig(${i},'type',this.value)"
-        style="padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;background:#fff;outline:none">
-        ${typeOpts}
-      </select>
-      ${extraOpts}
+  // Chips metrik yang sudah dipilih
+  const chips = fm.map(mKey=>{
+    const m = allMetrics.find(x=>x.key===mKey);
+    if(!m) return '';
+    return `<div class="dc-metric-chip">
+      <span style="font-size:10px;background:var(--pl);padding:1px 5px;border-radius:5px;color:var(--p);margin-right:3px">${m.category||'–'}</span>
+      ${m.picName} — ${m.label}
+      <span class="rm" onclick="removeFeaturedMetric('${mKey}')">✕</span>
     </div>`;
   }).join('');
 
-  // ── Trend Tabs config ──
-  const tabRows = dashboardConfig.trendTabs.map((tab,i)=>{
-    const chipMetrics = tab.metrics.map(mKey=>{
-      const m = allMetrics.find(x=>x.key===mKey);
-      return m ? `<div class="dc-metric-chip">${m.picName.slice(0,1)} ${m.label}
-        <span class="rm" onclick="removeTrendMetric(${i},'${mKey}')">✕</span></div>` : '';
-    }).join('');
-
-    const addOpts = allMetrics
-      .filter(m=>!tab.metrics.includes(m.key))
-      .map(m=>`<option value="${m.key}">${m.picName} — ${m.label}</option>`).join('');
-
-    return `<div class="dc-row" style="flex-direction:column;align-items:flex-start;gap:8px">
-      <div style="display:flex;align-items:center;gap:10px;width:100%">
-        <input type="checkbox" class="dc-chk" ${tab.enabled?'checked':''} onchange="updateTrendTabConfig(${i},'enabled',this.checked)">
-        <input class="s-inp" type="text" value="${tab.label}" style="flex:1;max-width:150px"
-          oninput="updateTrendTabConfig(${i},'label',this.value)" placeholder="Nama tab">
-      </div>
-      <div class="dc-metric-list">
-        ${chipMetrics}
-        ${addOpts?`<select onchange="addTrendMetric(${i},this.value);this.value=''"
-          style="padding:3px 8px;border:1.5px solid var(--border);border-radius:10px;font-size:11px;font-family:inherit;background:#fff;outline:none;cursor:pointer;min-width:120px">
-          <option value="">+ Tambah metrik</option>
-          ${addOpts}
-        </select>`:''}
-      </div>
-    </div>`;
-  }).join('');
+  // Dropdown tambah metrik (belum terpilih)
+  const addOpts = allMetrics
+    .filter(m=>!fm.includes(m.key))
+    .map(m=>`<option value="${m.key}">[${m.category||'–'}] ${m.picName} — ${m.label}</option>`)
+    .join('');
 
   el.innerHTML = `
     <div class="dc-section">
       <div class="dc-section-hd">
         <div>
-          <div class="dc-section-title">📊 Summary Cards</div>
-          <div class="dc-section-sub">Pilih hingga 4 kartu yang tampil di area overview</div>
+          <div class="dc-section-title">📊 Metrik Utama Dashboard</div>
+          <div class="dc-section-sub">Metrik yang dipilih akan tampil di Summary Cards dan Grafik Tren sekaligus. Maks 6 metrik disarankan untuk keterbacaan grafik.</div>
         </div>
       </div>
-      ${cardRows}
-    </div>
-    <div class="dc-section">
-      <div class="dc-section-hd">
-        <div>
-          <div class="dc-section-title">📈 Tab Grafik Tren</div>
-          <div class="dc-section-sub">Atur tab dan metrik yang ditampilkan di grafik</div>
+      <div style="padding:14px 16px">
+        <div class="dc-metric-list" id="fm-chip-list" style="margin-bottom:12px;min-height:36px">
+          ${chips || '<span style="font-size:12px;color:var(--tx3)">Belum ada metrik dipilih. Tambahkan dari dropdown di bawah.</span>'}
         </div>
-        <button class="dc-add-btn" onclick="addTrendTab()">+ Tab Baru</button>
+        ${addOpts ? `
+        <select onchange="addFeaturedMetric(this.value);this.value=''"
+          style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--rs);
+          font-size:12px;font-family:inherit;color:var(--tx);background:#fff;outline:none;cursor:pointer">
+          <option value="">+ Tambah metrik ke dashboard...</option>
+          ${addOpts}
+        </select>` : '<div style="font-size:12px;color:var(--tx3)">Semua metrik sudah ditambahkan.</div>'}
       </div>
-      ${tabRows}
     </div>
-    <div style="padding:10px 16px;background:var(--yl);border-radius:var(--r);font-size:12px;color:var(--yd)">
-      💡 Perubahan di sini langsung berlaku ke Dashboard tanpa perlu klik Simpan.
+    <div style="padding:0 0 14px;display:flex;justify-content:flex-end">
+      <button onclick="saveDashConfig()"
+        style="background:var(--p);color:#fff;border:none;padding:9px 22px;border-radius:20px;
+        font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .2s"
+        onmouseover="this.style.background='var(--pd)'" onmouseout="this.style.background='var(--p)'">
+        💾 Simpan Konfigurasi Dashboard
+      </button>
+    </div>
+    <div style="padding:10px 14px;background:var(--pl);border-radius:var(--r);font-size:12px;color:var(--p)">
+      💡 Klik <strong>Simpan Konfigurasi Dashboard</strong> agar tersimpan permanen ke Google Sheets.
+      Perubahan chips di atas langsung terlihat di Dashboard tapi belum tersimpan sampai Anda klik Simpan.
     </div>`;
 }
 
-function updateCardConfig(i, field, val){
-  dashboardConfig.summaryCards[i][field] = val;
-  renderDashConfig();
-  renderOverview();
-}
-function updateCardMetricConfig(i, val){
-  const [mKey,picId]=val.split('|');
-  dashboardConfig.summaryCards[i].metricKey=mKey;
-  dashboardConfig.summaryCards[i].picId=picId;
-  const pic=PICS.find(p=>p.id===picId);
-  const m=pic?.metrics.find(x=>x.key===mKey);
-  if(m) dashboardConfig.summaryCards[i].label=m.label;
-  renderDashConfig();
-  renderOverview();
-}
-function updateTrendTabConfig(i,field,val){
-  dashboardConfig.trendTabs[i][field]=val;
-  renderDashConfig();
-  renderTrendTabs();
-  drawTrend();
-}
-function addTrendMetric(tabIdx,mKey){
+// Featured metrics management
+function addFeaturedMetric(mKey){
   if(!mKey) return;
-  if(!dashboardConfig.trendTabs[tabIdx].metrics.includes(mKey)){
-    dashboardConfig.trendTabs[tabIdx].metrics.push(mKey);
+  if(!dashboardConfig.featuredMetrics.includes(mKey)){
+    dashboardConfig.featuredMetrics.push(mKey);
   }
   renderDashConfig();
-  drawTrend();
+  renderOverview();
 }
-function removeTrendMetric(tabIdx,mKey){
-  dashboardConfig.trendTabs[tabIdx].metrics=dashboardConfig.trendTabs[tabIdx].metrics.filter(k=>k!==mKey);
+function removeFeaturedMetric(mKey){
+  dashboardConfig.featuredMetrics = dashboardConfig.featuredMetrics.filter(k=>k!==mKey);
   renderDashConfig();
-  drawTrend();
+  renderOverview();
 }
-function addTrendTab(){
-  const id='custom_'+Date.now();
-  dashboardConfig.trendTabs.push({id,label:'Tab Baru',metrics:[],enabled:true});
-  renderDashConfig();
-  renderTrendTabs();
+function saveDashConfig(){
+  syncDashboardConfigToSheets();
 }
+// Legacy stubs — dipertahankan agar tidak error jika masih dipanggil
+function updateCardConfig(i,f,v){}
+function updateCardMetricConfig(i,v){}
+function updateTrendTabConfig(i,f,v){}
+function addTrendMetric(ti,k){ addFeaturedMetric(k); }
+function removeTrendMetric(ti,k){ removeFeaturedMetric(k); }
+function addTrendTab(){}
 
 /* ============================================================
    UPDATE renderSettings untuk tampilkan kolom Category
@@ -2479,12 +2817,10 @@ async function loadDashboardConfigFromSheets(){
   try {
     const res = await asGet({ action: 'load_dashboard_config' });
     if(res.status==='ok' && res.config){
-      // Merge — jangan replace seluruhnya agar field baru yang belum ada
-      // di config lama tetap ada dengan nilai default
       const saved = res.config;
-      if(saved.summaryCards) dashboardConfig.summaryCards = saved.summaryCards;
-      if(saved.trendTabs)    dashboardConfig.trendTabs    = saved.trendTabs;
-      if(saved.timeFilter)   Object.assign(dashboardConfig.timeFilter, saved.timeFilter);
+      // Hanya ambil field yang dikenal — ignore field lama (summaryCards, trendTabs)
+      if(Array.isArray(saved.featuredMetrics)) dashboardConfig.featuredMetrics = saved.featuredMetrics;
+      if(saved.timeFilter) Object.assign(dashboardConfig.timeFilter, saved.timeFilter);
     }
   } catch(e){
     console.warn('Gagal load dashboard config dari Sheets:', e.message);
