@@ -1254,8 +1254,12 @@ async function loadHistoryFromSheets(){
   } catch(e){
     console.warn('Gagal load dari Sheets:',e.message);
   }
-  renderHistory();
-  if(document.getElementById('pic-grid')?.children.length>0) renderCards();
+  // Hanya render history panel jika sedang aktif
+  const histPanel = document.getElementById('panel-history');
+  if(histPanel && histPanel.classList.contains('active')){
+    renderHistory();
+  }
+  // renderCards dan renderOverview dipanggil oleh caller (init/switchTab)
 }
 
 /* ============================================================
@@ -2166,12 +2170,15 @@ async function syncSubmitToSheetsLabel(pic, pType, periodLabel){
 /* PERIOD / TREND */
 function setPeriod(p){
   ui.period=p;
-  // Sync all per-card tabs to match global toggle
   PICS.forEach(pic=>{ picInputPeriod[pic.id]=p; });
-  document.getElementById('btn-weekly').classList.toggle('active',p==='weekly');
-  document.getElementById('btn-monthly').classList.toggle('active',p==='monthly');
-  document.getElementById('period-range').textContent=p==='weekly'?(getCurrentWeekLabel()+' (berjalan)'):getCurrentMonthLabel();
-  renderCards();renderOverview();
+  const bw=document.getElementById('btn-weekly');
+  const bm=document.getElementById('btn-monthly');
+  if(bw) bw.classList.toggle('active',p==='weekly');
+  if(bm) bm.classList.toggle('active',p==='monthly');
+  const pr=document.getElementById('period-range');
+  if(pr) pr.textContent=p==='weekly'?(getCurrentWeekLabel()+' (berjalan)'):getCurrentMonthLabel();
+  renderCards();
+  renderOverview();
 }
 function setTrend(t){
   // Tab grafik dihapus — grafik kini multi-line dari featuredMetrics
@@ -2192,52 +2199,62 @@ function renderOverview(){
 function renderSummaryCards(){
   const grid = document.getElementById('sum-grid-dynamic');
   if(!grid) return;
-  const pType    = dashboardConfig.timeFilter.periodType;
-  const periods  = getOverviewPeriodList();
-  const curLabel = periods[periods.length-1] || '';
-  const fm       = dashboardConfig.featuredMetrics;
 
-  // Card 1: selalu KPI On Track
-  let ontrack=0, total=0;
-  PICS.forEach(pic=>pic.metrics.forEach(m=>{
-    if(m.optional) return; total++;
-    const av=getAvForCard(pic,m,pType,curLabel);
-    const tv=getTvForCard(pic,m,pType,curLabel);
-    if(getStatus(av,tv,!!m.lowerBetter)==='green') ontrack++;
-  }));
+  const fm = dashboardConfig.featuredMetrics;
 
-  // Empty state jika tidak ada featured metrics
-  if(fm.length===0){
-    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--tx3);font-size:13px">
-      <div style="font-size:28px;margin-bottom:8px">📊</div>
-      Pilih metrik di <strong style="color:var(--p)">Pengaturan → Konfigurasi Dashboard</strong>
+  // Empty state — SEBELUM akses data apapun
+  if(!fm || fm.length===0){
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:28px 20px;
+      color:var(--tx3);font-size:13px;border:2px dashed var(--border);border-radius:var(--r)">
+      <div style="font-size:32px;margin-bottom:8px">📊</div>
+      <div style="font-weight:600;color:var(--tx2);margin-bottom:4px">Belum ada metrik yang dipilih</div>
+      Buka <strong style="color:var(--p)">⚙️ Pengaturan KPI → Konfigurasi Dashboard</strong>
+      untuk memilih metrik yang ingin ditampilkan.
     </div>`;
     return;
+  }
+
+  const pType    = dashboardConfig.timeFilter.periodType;
+  const periods  = getOverviewPeriodList();
+  const curLabel = periods.length ? periods[periods.length-1] : '';
+
+  // Card 1: KPI On Track (selalu tampil)
+  let ontrack=0, total=0;
+  if(curLabel){
+    PICS.forEach(pic=>pic.metrics.forEach(m=>{
+      if(m.optional) return; total++;
+      const av=getAvForCard(pic,m,pType,curLabel);
+      const tv=getTvForCard(pic,m,pType,curLabel);
+      if(getStatus(av,tv,!!m.lowerBetter)==='green') ontrack++;
+    }));
   }
 
   const cards = [{
     cls:'pu', lbl:'KPI On Track',
     val: total>0 ? ontrack+' / '+total : '–',
-    sub: total>0 ? 'metrik on track periode ini' : 'belum ada data'
+    sub: total>0 ? 'on track · '+curLabel : 'belum ada data'
   }];
 
+  // Card 2-4: dari featuredMetrics (maks 3)
   fm.slice(0,3).forEach((fk,i)=>{
     let pic=null, m=null;
     PICS.forEach(p=>{ const found=p.metrics.find(x=>x.key===fk); if(found){pic=p;m=found;} });
-    if(!pic||!m){ cards.push({cls:i%2===0?'ye':'pu',lbl:fk,val:'–',sub:'Metrik tidak ditemukan'}); return; }
-    const av = getAvForCard(pic,m,pType,curLabel);
+    if(!pic||!m){
+      cards.push({cls:i%2===0?'ye':'pu',lbl:fk,val:'–',sub:'Metrik tidak ditemukan'});
+      return;
+    }
+    const av      = curLabel ? getAvForCard(pic,m,pType,curLabel) : '–';
     const hasData = av && av!=='–' && av!=='';
     cards.push({
       cls: i%2===0?'ye':'pu',
       lbl: m.label,
       val: hasData ? av : '–',
-      sub: hasData ? pic.name+' · '+curLabel : 'Belum ada data untuk periode ini'
+      sub: hasData ? pic.name+' · '+curLabel : 'Belum ada data'
     });
   });
 
-  const colors=['pu','ye','pu','ye'];
-  grid.innerHTML = cards.map((c,i)=>`
-    <div class="sum-card ${c.cls||colors[i%4]}">
+  grid.innerHTML = cards.map(c=>`
+    <div class="sum-card ${c.cls}">
       <div class="sum-lbl">${c.lbl}</div>
       <div class="sum-val">${c.val}</div>
       <div class="sum-sub">${c.sub}</div>
@@ -2319,8 +2336,12 @@ function drawTrend(){
   const labels = getOverviewPeriodList();
 
   const fm = dashboardConfig.featuredMetrics;
+
+  // Selalu hapus empty state dulu
+  document.querySelectorAll('[data-empty-trend]').forEach(el=>el.remove());
+
   // Empty state jika tidak ada featured metrics
-  if(!fm.length){
+  if(!fm || !fm.length){
     if(trendChart){ trendChart.destroy(); trendChart=null; }
     const canvas = document.getElementById('trendChart');
     const legend = document.getElementById('trend-legend');
@@ -2328,17 +2349,25 @@ function drawTrend(){
     if(canvas){
       const ctx=canvas.getContext('2d');
       ctx.clearRect(0,0,canvas.width,canvas.height);
+      // Render empty state di dalam canvas area
+      const wrap = canvas.parentElement;
+      if(wrap && !wrap.querySelector('[data-empty-trend]')){
+        canvas.style.display='none';
+        const empty=document.createElement('div');
+        empty.dataset.emptyTrend='1';
+        empty.style.cssText='text-align:center;padding:40px 20px;color:var(--tx3);font-size:13px';
+        empty.innerHTML=`<div style="font-size:28px;margin-bottom:8px">📈</div>
+          <div style="font-weight:600;color:var(--tx2);margin-bottom:4px">Belum ada metrik yang dipilih</div>
+          Buka <strong style="color:var(--p)">⚙️ Pengaturan KPI → Konfigurasi Dashboard</strong>`;
+        wrap.appendChild(empty);
+      }
     }
-    const wrap=canvas?canvas.parentElement:null;
-    if(wrap) wrap.insertAdjacentHTML('afterend',
-      wrap.nextElementSibling?.dataset?.emptyTrend?'':
-      `<div data-empty-trend="1" style="text-align:center;padding:20px;color:var(--tx3);font-size:12px">
-        Pilih metrik di <strong style="color:var(--p)">Pengaturan → Konfigurasi Dashboard</strong> untuk menampilkan grafik.
-      </div>`);
     return;
   }
-  // Hapus empty state jika ada
-  document.querySelectorAll('[data-empty-trend]').forEach(el=>el.remove());
+
+  // Ada data — pastikan canvas visible
+  const cv = document.getElementById('trendChart');
+  if(cv) cv.style.display='';
 
   const COLORS = ['#534AB7','#EF9F27','#0F9E6F','#E03E3E','#185FA5','#993C1D'];
   const datasets = [];
@@ -2534,8 +2563,8 @@ function switchTab(tab){
     if(panel) panel.classList.toggle('active', t===tab);
     if(btn)   btn.classList.toggle('active', t===tab);
   });
-  if(tab==='dashboard') renderOverview();
-  if(tab==='history')   loadHistoryFromSheets();
+  if(tab==='dashboard') { renderCards(); renderOverview(); }
+  if(tab==='history')   { loadHistoryFromSheets().then(()=>renderHistory()); }
   if(tab==='settings')  renderSettings();
 }
 
@@ -2905,43 +2934,51 @@ function rebuildForecastMetricSelect(){
 }
 /* INIT */
 async function init(){
-  // Stamp type field onto PICS metrics if not present
+  // Step 1: Stamp type ke metrics
   PICS.forEach(pic=>pic.metrics.forEach(m=>{ if(!m.type) m.type=inferType(m); }));
 
-  // Set dynamic date labels
-  document.getElementById('period-range').textContent=getCurrentWeekLabel()+' (berjalan)';
-  document.getElementById('update-date').textContent=getTodayLabel();
+  // Step 2: Build label lists SEBELUM render apapun
+  WEEKLY_LABELS  = buildWeeklyLabels();
+  MONTHLY_LABELS = buildMonthlyLabels();
 
-  // Load dashboard config dari Sheets (agar konfigurasi cards/tabs persist)
-  setLoadStatus('Memuat konfigurasi...', 30);
+  // Step 3: Set date labels di topbar
+  const pr = document.getElementById('period-range');
+  const ud = document.getElementById('update-date');
+  if(pr) pr.textContent = getCurrentWeekLabel()+' (berjalan)';
+  if(ud) ud.textContent = getTodayLabel();
+
+  // Step 4: Load remote data
+  setLoadStatus('Memuat konfigurasi...', 25);
   await loadDashboardConfigFromSheets();
 
-  // Load kpi_settings dari Sheets (agar category & target ter-restore)
-  setLoadStatus('Memuat pengaturan KPI...', 50);
+  setLoadStatus('Memuat pengaturan KPI...', 45);
   await loadKpiSettingsFromSheets();
 
-  // Re-sync settingsData setelah PICS mungkin diupdate dari Sheets
-  settingsData=PICS.map(pic=>({
-    id:pic.id,
-    metrics:pic.metrics.map(m=>({
-      key:m.key, label:m.label,
-      category:m.category||'',
-      type:m.type||inferType(m),
-      lowerBetter:!!m.lowerBetter,
-      optional:!!m.optional,
-      targetWeekly:m.target.weekly||'',
-      targetMonthly:m.target.monthly||''
+  // Step 5: Sync settingsData dari PICS (sudah diupdate dari Sheets)
+  settingsData = PICS.map(pic=>({
+    id: pic.id,
+    metrics: pic.metrics.map(m=>({
+      key:          m.key,
+      label:        m.label,
+      category:     m.category||'',
+      type:         m.type||inferType(m),
+      lowerBetter:  !!m.lowerBetter,
+      optional:     !!m.optional,
+      targetWeekly:  m.target.weekly||'',
+      targetMonthly: m.target.monthly||''
     }))
   }));
 
-  // Load history agar getPrevEntry dan trend chart bisa bekerja
-  setLoadStatus('Memuat histori KPI...', 70);
+  // Step 6: Load history
+  setLoadStatus('Memuat histori KPI...', 65);
   await loadHistoryFromSheets();
 
-  setLoadStatus('Merender dashboard...', 90);
+  // Step 7: Render semua
+  setLoadStatus('Merender dashboard...', 88);
   renderCards();
   renderOverview();
   rebuildForecastMetricSelect();
+  setLoadStatus('Selesai!', 100);
 }
 // init() dipanggil dari showDashboard() setelah login berhasil
 
