@@ -1010,9 +1010,9 @@ let trendChart=null;
 
 /* DASHBOARD CONFIG — dikontrol dari Settings */
 let dashboardConfig = {
-  // Metrik utama yang ditampilkan di overview cards DAN grafik tren
-  // Default kosong — user harus pilih sendiri
-  featuredMetrics: [],
+  // Metrics groups — tiap group tampil sebagai summary card + tab grafik
+  // Default kosong, user buat sendiri lewat Settings → Konfigurasi Dashboard
+  metricsGroups: [],
   // Filter waktu overview
   timeFilter: {
     periodType: 'weekly',
@@ -1021,6 +1021,9 @@ let dashboardConfig = {
     to:   '',
   }
 };
+
+// Helper: generate unique group id
+function newGroupId(){ return 'grp_'+Date.now()+'_'+Math.random().toString(36).slice(2,6); }
 
 
 /* DATE HELPERS — Narasi week: Senin (Mon) – Minggu (Sun) */
@@ -2181,8 +2184,7 @@ function setPeriod(p){
   renderOverview();
 }
 function setTrend(t){
-  // Tab grafik dihapus — grafik kini multi-line dari featuredMetrics
-  // Fungsi ini dipertahankan agar tidak error jika masih terpanggil
+  ui.trend = t;
   drawTrend();
 }
 /* drawTrend legacy removed — see drawTrend below */
@@ -2200,25 +2202,24 @@ function renderSummaryCards(){
   const grid = document.getElementById('sum-grid-dynamic');
   if(!grid) return;
 
-  const fm = dashboardConfig.featuredMetrics;
+  const groups = dashboardConfig.metricsGroups;
+  const pType  = dashboardConfig.timeFilter.periodType;
+  const periods = getOverviewPeriodList();
+  const curLabel = periods.length ? periods[periods.length-1] : '';
 
-  // Empty state — SEBELUM akses data apapun
-  if(!fm || fm.length===0){
+  // Empty state jika belum ada group
+  if(!groups || groups.length===0){
     grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:28px 20px;
       color:var(--tx3);font-size:13px;border:2px dashed var(--border);border-radius:var(--r)">
       <div style="font-size:32px;margin-bottom:8px">📊</div>
-      <div style="font-weight:600;color:var(--tx2);margin-bottom:4px">Belum ada metrik yang dipilih</div>
+      <div style="font-weight:600;color:var(--tx2);margin-bottom:4px">Belum ada Metrics Group</div>
       Buka <strong style="color:var(--p)">⚙️ Pengaturan KPI → Konfigurasi Dashboard</strong>
-      untuk memilih metrik yang ingin ditampilkan.
+      untuk membuat metrics group.
     </div>`;
     return;
   }
 
-  const pType    = dashboardConfig.timeFilter.periodType;
-  const periods  = getOverviewPeriodList();
-  const curLabel = periods.length ? periods[periods.length-1] : '';
-
-  // Card 1: KPI On Track (selalu tampil)
+  // Card 1: KPI On Track
   let ontrack=0, total=0;
   if(curLabel){
     PICS.forEach(pic=>pic.metrics.forEach(m=>{
@@ -2228,29 +2229,35 @@ function renderSummaryCards(){
       if(getStatus(av,tv,!!m.lowerBetter)==='green') ontrack++;
     }));
   }
-
-  const cards = [{
+  const cards=[{
     cls:'pu', lbl:'KPI On Track',
     val: total>0 ? ontrack+' / '+total : '–',
     sub: total>0 ? 'on track · '+curLabel : 'belum ada data'
   }];
 
-  // Card 2-4: dari featuredMetrics (maks 3)
-  fm.slice(0,3).forEach((fk,i)=>{
-    let pic=null, m=null;
-    PICS.forEach(p=>{ const found=p.metrics.find(x=>x.key===fk); if(found){pic=p;m=found;} });
-    if(!pic||!m){
-      cards.push({cls:i%2===0?'ye':'pu',lbl:fk,val:'–',sub:'Metrik tidak ditemukan'});
-      return;
-    }
-    const av      = curLabel ? getAvForCard(pic,m,pType,curLabel) : '–';
-    const hasData = av && av!=='–' && av!=='';
-    cards.push({
-      cls: i%2===0?'ye':'pu',
-      lbl: m.label,
-      val: hasData ? av : '–',
-      sub: hasData ? pic.name+' · '+curLabel : 'Belum ada data'
+  // Card per group (maks 3 group tambahan = 4 cards total)
+  const CLRS=['ye','pu','ye','pu'];
+  groups.slice(0,3).forEach((grp,gi)=>{
+    // Hitung total/rata-rata untuk group ini
+    let sum=0, count=0, hasRp=false, hasPct=false;
+    (grp.metrics||[]).forEach(mKey=>{
+      let pic=null, m=null;
+      PICS.forEach(p=>{ const f=p.metrics.find(x=>x.key===mKey); if(f){pic=p;m=f;} });
+      if(!pic||!m||!curLabel) return;
+      const av=getAvForCard(pic,m,pType,curLabel);
+      const v=parseRaw(av);
+      if(v!==null){ sum+=v; count++; }
+      if(m.type==='rupiah') hasRp=true;
+      if(m.type==='persen') hasPct=true;
     });
+    let val='–', sub='Belum ada data';
+    if(count>0){
+      if(hasRp)      val='Rp '+(sum/1000000).toFixed(1)+' Jt';
+      else if(hasPct) val=(sum/count).toFixed(1)+'%';
+      else val=sum>=1000000?(sum/1000000).toFixed(1)+' Jt':sum>=1000?(sum/1000).toFixed(0)+' Rb':sum.toLocaleString('id-ID');
+      sub=(grp.metrics||[]).length+' metrik · '+curLabel;
+    }
+    cards.push({ cls:CLRS[gi%4], lbl:grp.name||'Group '+(gi+1), val, sub });
   });
 
   grid.innerHTML = cards.map(c=>`
@@ -2335,29 +2342,39 @@ function drawTrend(){
   const pType  = dashboardConfig.timeFilter.periodType;
   const labels = getOverviewPeriodList();
 
-  const fm = dashboardConfig.featuredMetrics;
+  const groups = dashboardConfig.metricsGroups;
 
   // Selalu hapus empty state dulu
   document.querySelectorAll('[data-empty-trend]').forEach(el=>el.remove());
 
-  // Empty state jika tidak ada featured metrics
-  if(!fm || !fm.length){
+  // Render tabs berdasarkan groups
+  const tabsEl = document.getElementById('trend-tabs-dynamic');
+  if(tabsEl){
+    if(!groups||!groups.length){ tabsEl.innerHTML=''; }
+    else {
+      if(!groups.find(g=>g.id===ui.trend)) ui.trend=groups[0].id;
+      tabsEl.innerHTML=groups.map(g=>
+        `<button class="trend-tab${g.id===ui.trend?' active':''}"
+          id="ttab-${g.id}" onclick="setTrend('${g.id}')">${g.name}</button>`
+      ).join('');
+    }
+  }
+
+  // Empty state jika tidak ada group
+  if(!groups || !groups.length){
     if(trendChart){ trendChart.destroy(); trendChart=null; }
     const canvas = document.getElementById('trendChart');
     const legend = document.getElementById('trend-legend');
     if(legend) legend.innerHTML='';
     if(canvas){
-      const ctx=canvas.getContext('2d');
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      // Render empty state di dalam canvas area
-      const wrap = canvas.parentElement;
+      canvas.style.display='none';
+      const wrap=canvas.parentElement;
       if(wrap && !wrap.querySelector('[data-empty-trend]')){
-        canvas.style.display='none';
         const empty=document.createElement('div');
         empty.dataset.emptyTrend='1';
         empty.style.cssText='text-align:center;padding:40px 20px;color:var(--tx3);font-size:13px';
         empty.innerHTML=`<div style="font-size:28px;margin-bottom:8px">📈</div>
-          <div style="font-weight:600;color:var(--tx2);margin-bottom:4px">Belum ada metrik yang dipilih</div>
+          <div style="font-weight:600;color:var(--tx2);margin-bottom:4px">Belum ada Metrics Group</div>
           Buka <strong style="color:var(--p)">⚙️ Pengaturan KPI → Konfigurasi Dashboard</strong>`;
         wrap.appendChild(empty);
       }
@@ -2365,14 +2382,18 @@ function drawTrend(){
     return;
   }
 
-  // Ada data — pastikan canvas visible
+  // Ada groups — pastikan canvas visible
   const cv = document.getElementById('trendChart');
   if(cv) cv.style.display='';
+
+  // Plot metrik dari group yang aktif
+  const activeGroup = groups.find(g=>g.id===ui.trend) || groups[0];
+  if(!activeGroup) return;
 
   const COLORS = ['#534AB7','#EF9F27','#0F9E6F','#E03E3E','#185FA5','#993C1D'];
   const datasets = [];
 
-  fm.forEach((mKey,ci)=>{
+  (activeGroup.metrics||[]).forEach((mKey,ci)=>{
     let metricMeta = null, picForMetric = null;
     PICS.forEach(pic=>{
       const m = pic.metrics.find(x=>x.key===mKey);
@@ -2469,87 +2490,128 @@ function renderDashConfig(){
   const el = document.getElementById('dash-config-content');
   if(!el) return;
 
-  const fm = dashboardConfig.featuredMetrics;
+  const groups = dashboardConfig.metricsGroups;
   const allMetrics = PICS.flatMap(p=>p.metrics.filter(m=>!m.optional).map(m=>({
-    key:m.key, label:m.label, category:m.category||'', picName:p.name, picId:p.id
+    key:m.key, label:m.label, category:m.category||'', picName:p.name
   })));
 
-  // Chips metrik yang sudah dipilih
-  const chips = fm.map(mKey=>{
-    const m = allMetrics.find(x=>x.key===mKey);
-    if(!m) return '';
-    return `<div class="dc-metric-chip">
-      <span style="font-size:10px;background:var(--pl);padding:1px 5px;border-radius:5px;color:var(--p);margin-right:3px">${m.category||'–'}</span>
-      ${m.picName} — ${m.label}
-      <span class="rm" onclick="removeFeaturedMetric('${mKey}')">✕</span>
+  // Render tiap group sebagai card
+  const groupCards = groups.map((grp,gi)=>{
+    const chips = (grp.metrics||[]).map(mKey=>{
+      const m=allMetrics.find(x=>x.key===mKey);
+      if(!m) return '';
+      return `<div class="dc-metric-chip">
+        <span style="font-size:10px;background:var(--pl);padding:1px 5px;border-radius:5px;color:var(--p);margin-right:3px">${m.category||'–'}</span>
+        ${m.picName} — ${m.label}
+        <span class="rm" onclick="removeGroupMetric(${gi},'${mKey}')">✕</span>
+      </div>`;
+    }).join('');
+
+    const usedKeys = (grp.metrics||[]);
+    const addOpts = allMetrics
+      .filter(m=>!usedKeys.includes(m.key))
+      .map(m=>`<option value="${m.key}">[${m.category||'–'}] ${m.picName} — ${m.label}</option>`)
+      .join('');
+
+    return `<div class="dc-section">
+      <div class="dc-section-hd">
+        <div style="display:flex;align-items:center;gap:10px;flex:1">
+          <input class="s-inp" type="text" value="${grp.name||''}" placeholder="Nama group..."
+            oninput="updateGroupName(${gi},this.value)"
+            style="max-width:200px;font-weight:700">
+          <span style="font-size:11px;color:var(--tx3)">${(grp.metrics||[]).length} metrik</span>
+        </div>
+        <button class="s-del" onclick="deleteGroup(${gi})" title="Hapus group">✕ Hapus</button>
+      </div>
+      <div style="padding:12px 16px">
+        <div class="dc-metric-list" style="margin-bottom:10px;min-height:32px">
+          ${chips||'<span style="font-size:12px;color:var(--tx3)">Belum ada metrik. Tambahkan dari dropdown.</span>'}
+        </div>
+        ${addOpts?`<select onchange="addGroupMetric(${gi},this.value);this.value=''"
+          style="width:100%;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--rs);
+          font-size:12px;font-family:inherit;color:var(--tx);background:#fff;outline:none;cursor:pointer">
+          <option value="">+ Tambah metrik ke group ini...</option>
+          ${addOpts}
+        </select>`:'<div style="font-size:12px;color:var(--tx3)">Semua metrik sudah ditambahkan.</div>'}
+      </div>
     </div>`;
   }).join('');
 
-  // Dropdown tambah metrik (belum terpilih)
-  const addOpts = allMetrics
-    .filter(m=>!fm.includes(m.key))
-    .map(m=>`<option value="${m.key}">[${m.category||'–'}] ${m.picName} — ${m.label}</option>`)
-    .join('');
-
   el.innerHTML = `
-    <div class="dc-section">
-      <div class="dc-section-hd">
-        <div>
-          <div class="dc-section-title">📊 Metrik Utama Dashboard</div>
-          <div class="dc-section-sub">Metrik yang dipilih akan tampil di Summary Cards dan Grafik Tren sekaligus. Maks 6 metrik disarankan untuk keterbacaan grafik.</div>
-        </div>
-      </div>
-      <div style="padding:14px 16px">
-        <div class="dc-metric-list" id="fm-chip-list" style="margin-bottom:12px;min-height:36px">
-          ${chips || '<span style="font-size:12px;color:var(--tx3)">Belum ada metrik dipilih. Tambahkan dari dropdown di bawah.</span>'}
-        </div>
-        ${addOpts ? `
-        <select onchange="addFeaturedMetric(this.value);this.value=''"
-          style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--rs);
-          font-size:12px;font-family:inherit;color:var(--tx);background:#fff;outline:none;cursor:pointer">
-          <option value="">+ Tambah metrik ke dashboard...</option>
-          ${addOpts}
-        </select>` : '<div style="font-size:12px;color:var(--tx3)">Semua metrik sudah ditambahkan.</div>'}
-      </div>
-    </div>
-    <div style="padding:0 0 14px;display:flex;justify-content:flex-end">
+    ${groupCards||`<div style="text-align:center;padding:28px;color:var(--tx3);border:2px dashed var(--border);border-radius:var(--r);margin-bottom:14px">
+      <div style="font-size:28px;margin-bottom:8px">📂</div>
+      <div style="font-weight:600;color:var(--tx2);margin-bottom:4px">Belum ada Metrics Group</div>
+      Klik tombol di bawah untuk membuat group pertama.
+    </div>`}
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-bottom:4px">
+      <button onclick="addGroup()"
+        style="background:var(--p);color:#fff;border:none;padding:9px 20px;border-radius:20px;
+        font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+        + Buat Metrics Group Baru
+      </button>
       <button onclick="saveDashConfig()"
-        style="background:var(--p);color:#fff;border:none;padding:9px 22px;border-radius:20px;
-        font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .2s"
-        onmouseover="this.style.background='var(--pd)'" onmouseout="this.style.background='var(--p)'">
-        💾 Simpan Konfigurasi Dashboard
+        style="background:#fff;color:var(--p);border:2px solid var(--p);padding:8px 20px;border-radius:20px;
+        font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+        💾 Simpan Konfigurasi
       </button>
     </div>
-    <div style="padding:10px 14px;background:var(--pl);border-radius:var(--r);font-size:12px;color:var(--p)">
-      💡 Klik <strong>Simpan Konfigurasi Dashboard</strong> agar tersimpan permanen ke Google Sheets.
-      Perubahan chips di atas langsung terlihat di Dashboard tapi belum tersimpan sampai Anda klik Simpan.
+    <div style="margin-top:10px;padding:10px 14px;background:var(--pl);border-radius:var(--r);font-size:12px;color:var(--p)">
+      💡 Group akan tampil sebagai <strong>summary card</strong> dan <strong>tab grafik</strong> di halaman utama.
+      Klik <strong>Simpan Konfigurasi</strong> agar tersimpan ke Google Sheets.
     </div>`;
 }
 
-// Featured metrics management
-function addFeaturedMetric(mKey){
-  if(!mKey) return;
-  if(!dashboardConfig.featuredMetrics.includes(mKey)){
-    dashboardConfig.featuredMetrics.push(mKey);
-  }
+// Metrics Group management
+function addGroup(){
+  dashboardConfig.metricsGroups.push({
+    id: newGroupId(),
+    name: 'Group '+(dashboardConfig.metricsGroups.length+1),
+    metrics: []
+  });
   renderDashConfig();
   renderOverview();
 }
-function removeFeaturedMetric(mKey){
-  dashboardConfig.featuredMetrics = dashboardConfig.featuredMetrics.filter(k=>k!==mKey);
+function deleteGroup(gi){
+  dashboardConfig.metricsGroups.splice(gi,1);
+  // Reset trend tab jika group yang dihapus sedang aktif
+  if(dashboardConfig.metricsGroups.length>0)
+    ui.trend=dashboardConfig.metricsGroups[0].id;
+  renderDashConfig();
+  renderOverview();
+}
+function updateGroupName(gi,name){
+  if(dashboardConfig.metricsGroups[gi]) dashboardConfig.metricsGroups[gi].name=name;
+  // Update tab di grafik langsung
+  const tabBtn=document.getElementById('ttab-'+dashboardConfig.metricsGroups[gi]?.id);
+  if(tabBtn) tabBtn.textContent=name;
+}
+function addGroupMetric(gi,mKey){
+  if(!mKey) return;
+  const grp=dashboardConfig.metricsGroups[gi];
+  if(!grp) return;
+  if(!grp.metrics.includes(mKey)) grp.metrics.push(mKey);
+  renderDashConfig();
+  renderOverview();
+}
+function removeGroupMetric(gi,mKey){
+  const grp=dashboardConfig.metricsGroups[gi];
+  if(!grp) return;
+  grp.metrics=grp.metrics.filter(k=>k!==mKey);
   renderDashConfig();
   renderOverview();
 }
 function saveDashConfig(){
   syncDashboardConfigToSheets();
 }
-// Legacy stubs — dipertahankan agar tidak error jika masih dipanggil
+// Legacy stubs
+function addFeaturedMetric(k){ if(dashboardConfig.metricsGroups.length) addGroupMetric(0,k); }
+function removeFeaturedMetric(k){ dashboardConfig.metricsGroups.forEach((_,i)=>removeGroupMetric(i,k)); }
 function updateCardConfig(i,f,v){}
 function updateCardMetricConfig(i,v){}
 function updateTrendTabConfig(i,f,v){}
-function addTrendMetric(ti,k){ addFeaturedMetric(k); }
-function removeTrendMetric(ti,k){ removeFeaturedMetric(k); }
-function addTrendTab(){}
+function addTrendMetric(ti,k){ addGroupMetric(ti,k); }
+function removeTrendMetric(ti,k){ removeGroupMetric(ti,k); }
+function addTrendTab(){ addGroup(); }
 
 /* ============================================================
    UPDATE renderSettings untuk tampilkan kolom Category
@@ -2847,8 +2909,13 @@ async function loadDashboardConfigFromSheets(){
     const res = await asGet({ action: 'load_dashboard_config' });
     if(res.status==='ok' && res.config){
       const saved = res.config;
-      // Hanya ambil field yang dikenal — ignore field lama (summaryCards, trendTabs)
-      if(Array.isArray(saved.featuredMetrics)) dashboardConfig.featuredMetrics = saved.featuredMetrics;
+      if(Array.isArray(saved.metricsGroups))  dashboardConfig.metricsGroups = saved.metricsGroups;
+      // Legacy migration: convert old featuredMetrics to one group
+      else if(Array.isArray(saved.featuredMetrics) && saved.featuredMetrics.length){
+        dashboardConfig.metricsGroups = [{
+          id: newGroupId(), name:'Semua Metrik', metrics:saved.featuredMetrics
+        }];
+      }
       if(saved.timeFilter) Object.assign(dashboardConfig.timeFilter, saved.timeFilter);
     }
   } catch(e){
@@ -2947,14 +3014,21 @@ async function init(){
   if(pr) pr.textContent = getCurrentWeekLabel()+' (berjalan)';
   if(ud) ud.textContent = getTodayLabel();
 
-  // Step 4: Load remote data
-  setLoadStatus('Memuat konfigurasi...', 25);
-  await loadDashboardConfigFromSheets();
+  // Step 4: syncSettingsData dari data lokal
+  syncSettingsDataFromPICS();
 
-  setLoadStatus('Memuat pengaturan KPI...', 45);
-  await loadKpiSettingsFromSheets();
+  // Step 5: RENDER SEGERA dengan data lokal — tidak ada delay
+  hideLoading();
+  renderCards();
+  renderOverview();
+  rebuildForecastMetricSelect();
 
-  // Step 5: Sync settingsData dari PICS (sudah diupdate dari Sheets)
+  // Step 6: Fetch remote data di background (non-blocking)
+  // Dashboard sudah tampil, data akan diupdate setelah fetch selesai
+  refreshFromSheets();
+}
+
+function syncSettingsDataFromPICS(){
   settingsData = PICS.map(pic=>({
     id: pic.id,
     metrics: pic.metrics.map(m=>({
@@ -2968,17 +3042,21 @@ async function init(){
       targetMonthly: m.target.monthly||''
     }))
   }));
+}
 
-  // Step 6: Load history
-  setLoadStatus('Memuat histori KPI...', 65);
-  await loadHistoryFromSheets();
-
-  // Step 7: Render semua
-  setLoadStatus('Merender dashboard...', 88);
-  renderCards();
-  renderOverview();
-  rebuildForecastMetricSelect();
-  setLoadStatus('Selesai!', 100);
+async function refreshFromSheets(){
+  // Background fetch — dashboard sudah tampil, ini hanya update data
+  try {
+    await loadDashboardConfigFromSheets();
+    await loadKpiSettingsFromSheets();
+    syncSettingsDataFromPICS();
+    await loadHistoryFromSheets();
+    // Re-render setelah semua data masuk
+    renderCards();
+    renderOverview();
+  } catch(e){
+    console.warn('Background refresh failed:', e.message);
+  }
 }
 // init() dipanggil dari showDashboard() setelah login berhasil
 
