@@ -723,12 +723,16 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
       </div>
     </div>
 
-    <!-- Settings top-level tabs: KPI per PIC | Konfigurasi Dashboard -->
+    <!-- Settings top-level tabs -->
     <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border)">
       <button id="stab-kpi" onclick="setSettingsSection('kpi')"
         style="padding:9px 20px;font-size:13px;font-weight:700;border:none;cursor:pointer;
         font-family:inherit;background:transparent;color:var(--p);
         border-bottom:3px solid var(--p);margin-bottom:-2px">⚙️ KPI per Anggota</button>
+      <button id="stab-members" onclick="setSettingsSection('members')"
+        style="padding:9px 20px;font-size:13px;font-weight:700;border:none;cursor:pointer;
+        font-family:inherit;background:transparent;color:var(--tx3);
+        border-bottom:3px solid transparent;margin-bottom:-2px">👥 Anggota Tim</button>
       <button id="stab-dash" onclick="setSettingsSection('dash')"
         style="padding:9px 20px;font-size:13px;font-weight:700;border:none;cursor:pointer;
         font-family:inherit;background:transparent;color:var(--tx3);
@@ -737,10 +741,13 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 
     <!-- KPI Section -->
     <div id="settings-section-kpi">
-      <!-- PIC selector tabs -->
       <div style="display:flex;gap:4px;margin-bottom:16px;background:var(--pl);border-radius:var(--r);padding:5px" id="settings-pic-tabs"></div>
-      <!-- Settings content per PIC -->
       <div id="settings-content"></div>
+    </div>
+
+    <!-- Members Section -->
+    <div id="settings-section-members" style="display:none">
+      <div id="members-content"></div>
     </div>
 
     <!-- Dashboard Config Section -->
@@ -945,7 +952,7 @@ function hideLoading() {
 }
 
 /* MASTER DATA */
-const PICS=[
+let PICS=[
   {id:'indra',name:'Indra',role:'SEO Specialist',animal:'🐕',abg:'#EEEDFE',badge:'SEO',bstyle:'background:#EEEDFE;color:#534AB7;',
    metrics:[
     {key:'seo_main',category:'Traffic',label:'Organic Traffic — Main Domain',actual:{weekly:'–',monthly:'–'},target:{weekly:'50.000',monthly:'200.000'}},
@@ -985,14 +992,14 @@ const PICS=[
   ]}
 ];
 
-const PIC_STYLES={
+let PIC_STYLES={
   'Indra':    {animal:'🐕',bg:'#EEEDFE',color:'#534AB7'},
   'Moniq':    {animal:'🐱',bg:'#E1F5EE',color:'#0F6E56'},
   'Hokkie':   {animal:'🐰',bg:'#FAEEDA',color:'#854F0B'},
   'Asmarani': {animal:'🦊',bg:'#FAECE7',color:'#993C1D'},
   'Taufik':   {animal:'🐼',bg:'#E6F1FB',color:'#185FA5'}
 };
-const ROLE_COLORS={
+let ROLE_COLORS={
   'SEO Specialist':     'background:#EEEDFE;color:#534AB7;',
   'Growth Specialist':  'background:#E1F5EE;color:#0F6E56;',
   'Paid Ads Specialist':'background:#FAEEDA;color:#854F0B;',
@@ -2473,13 +2480,17 @@ function drawTrend(){
    ============================================================ */
 
 function setSettingsSection(sec){
-  document.getElementById('settings-section-kpi').style.display  = sec==='kpi'?'block':'none';
-  document.getElementById('settings-section-dash').style.display = sec==='dash'?'block':'none';
-  document.getElementById('stab-kpi').style.color  = sec==='kpi'?'var(--p)':'var(--tx3)';
-  document.getElementById('stab-kpi').style.borderBottomColor  = sec==='kpi'?'var(--p)':'transparent';
-  document.getElementById('stab-dash').style.color = sec==='dash'?'var(--p)':'var(--tx3)';
-  document.getElementById('stab-dash').style.borderBottomColor = sec==='dash'?'var(--p)':'transparent';
-  if(sec==='dash') renderDashConfig();
+  ['kpi','members','dash'].forEach(s=>{
+    const panel=document.getElementById('settings-section-'+s);
+    const btn=document.getElementById('stab-'+s);
+    if(panel) panel.style.display = s===sec?'block':'none';
+    if(btn){
+      btn.style.color = s===sec?'var(--p)':'var(--tx3)';
+      btn.style.borderBottomColor = s===sec?'var(--p)':'transparent';
+    }
+  });
+  if(sec==='dash')    renderDashConfig();
+  if(sec==='members') renderMembersSettings();
 }
 
 /* ============================================================
@@ -2999,6 +3010,304 @@ function rebuildForecastMetricSelect(){
     if(grp.children.length) sel.appendChild(grp);
   });
 }
+
+/* ============================================================
+   MEMBER MANAGEMENT — tambah / edit / hapus anggota tim
+   ============================================================ */
+
+// Default member IDs — tidak boleh dihapus
+const DEFAULT_MEMBER_IDS = ['indra','moniq','hokkie','asmarani','taufik'];
+
+async function syncMembersToSheets(){
+  try {
+    const members = PICS.map((pic,i)=>({
+      id:         pic.id,
+      name:       pic.name,
+      role:       pic.role,
+      animal:     pic.animal,
+      abg:        pic.abg,
+      badge:      pic.badge,
+      bstyle:     pic.bstyle,
+      is_default: DEFAULT_MEMBER_IDS.includes(pic.id)
+    }));
+    const res = await asPost({ action:'save_members', members });
+    if(res.status==='ok'){
+      showToast('✅ Data anggota tim tersimpan ke Sheets.');
+    } else {
+      showToast('⚠️ Gagal sync anggota ke Sheets: '+(res.message||''));
+    }
+  } catch(e){
+    showToast('⚠️ Gagal sync anggota ke Sheets. Cek koneksi.');
+    console.warn('syncMembersToSheets error:', e.message);
+  }
+}
+
+async function loadMembersFromSheets(){
+  try {
+    const res = await asGet({ action:'load_members' });
+    if(res.status!=='ok' || !res.data || !res.data.length) return;
+
+    res.data.forEach(m=>{
+      const existing = PICS.find(p=>p.id===m.id);
+      if(existing){
+        // Update field yang mungkin berubah (kecuali metrics — itu dari kpi_settings)
+        existing.name   = m.name;
+        existing.role   = m.role;
+        existing.animal = m.animal;
+        existing.abg    = m.abg;
+        existing.badge  = m.badge;
+        existing.bstyle = m.bstyle;
+      } else {
+        // Member baru dari Sheets yang belum ada di PICS lokal
+        PICS.push({
+          id:      m.id,
+          name:    m.name,
+          role:    m.role,
+          animal:  m.animal,
+          abg:     m.abg,
+          badge:   m.badge,
+          bstyle:  m.bstyle,
+          metrics: []
+        });
+        // Update PIC_STYLES dan ROLE_COLORS
+        const colorMatch = m.bstyle.match(/color:([^;]+)/);
+        const color = colorMatch ? colorMatch[1].trim() : '#534AB7';
+        PIC_STYLES[m.name] = { animal:m.animal, bg:m.abg, color };
+        ROLE_COLORS[m.role] = m.bstyle;
+      }
+    });
+
+    // Hapus member yang ada di PICS tapi tidak ada di Sheets
+    // (kecuali default members — jaga-jaga kalau Sheets kosong)
+    if(res.data.length > 0){
+      const sheetsIds = res.data.map(m=>m.id);
+      const toRemove  = PICS.filter(p=>
+        !sheetsIds.includes(p.id) && !DEFAULT_MEMBER_IDS.includes(p.id)
+      );
+      toRemove.forEach(p=>{
+        const idx=PICS.findIndex(x=>x.id===p.id);
+        if(idx>=0) PICS.splice(idx,1);
+      });
+    }
+  } catch(e){
+    console.warn('loadMembersFromSheets error:', e.message);
+  }
+}
+/* ============================================================
+   MEMBER MANAGEMENT — tambah / edit / hapus anggota tim
+   ============================================================ */
+
+// Warna avatar yang tersedia untuk anggota baru
+const AVATAR_OPTIONS=['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯',
+  '🦁','🐮','🐷','🐸','🐵','🦄','🐺','🦝','🦦','🦥'];
+const COLOR_PALETTES=[
+  {bg:'#EEEDFE',color:'#534AB7'},{bg:'#E1F5EE',color:'#0F6E56'},
+  {bg:'#FAEEDA',color:'#854F0B'},{bg:'#FAECE7',color:'#993C1D'},
+  {bg:'#E6F1FB',color:'#185FA5'},{bg:'#F9E8F6',color:'#7B2D8B'},
+  {bg:'#E8F5E9',color:'#2E7D32'},{bg:'#FFF8E1',color:'#F57F17'},
+  {bg:'#FCE4EC',color:'#C62828'},{bg:'#E3F2FD',color:'#1565C0'},
+];
+
+function renderMembersSettings(){
+  const el = document.getElementById('members-content');
+  if(!el) return;
+
+  const memberRows = PICS.map((pic,i)=>{
+    const isDefault = DEFAULT_MEMBER_IDS.includes(pic.id);
+    return `<div class="dc-section" style="margin-bottom:10px">
+      <div class="dc-section-hd">
+        <div class="s-pic-info">
+          <div style="font-size:28px;width:44px;height:44px;background:${pic.abg};border-radius:10px;
+            display:flex;align-items:center;justify-content:center">${pic.animal}</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--tx)">${pic.name}</div>
+            <div style="font-size:11px;color:var(--tx2)">${pic.role}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:11px;color:var(--tx3)">${pic.metrics.filter(m=>!m.optional).length} metrik aktif</span>
+          ${!isDefault?`<button class="s-del" onclick="deleteMember('${pic.id}')">✕ Hapus</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    ${memberRows}
+
+    <!-- Form tambah anggota baru -->
+    <div class="dc-section" style="border:2px dashed var(--border)">
+      <div class="dc-section-hd" style="background:transparent">
+        <div class="dc-section-title">➕ Tambah Anggota Tim Baru</div>
+      </div>
+      <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--tx2);display:block;margin-bottom:5px">Nama</label>
+          <input id="new-member-name" class="s-inp" type="text" placeholder="Nama anggota...">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--tx2);display:block;margin-bottom:5px">Role / Jabatan</label>
+          <input id="new-member-role" class="s-inp" type="text" placeholder="Contoh: Content Specialist">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--tx2);display:block;margin-bottom:5px">Avatar</label>
+          <div style="display:flex;flex-wrap:wrap;gap:6px" id="avatar-picker">
+            ${AVATAR_OPTIONS.map((a,i)=>`<button onclick="selectAvatar('${a}',this)"
+              style="font-size:22px;padding:4px 6px;border-radius:8px;border:2px solid ${i===0?'var(--p)':'var(--border)'};
+              background:${i===0?'var(--pl)':'#fff'};cursor:pointer;line-height:1"
+              data-avatar="${a}">${a}</button>`).join('')}
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:700;color:var(--tx2);display:block;margin-bottom:5px">Warna Badge</label>
+          <div style="display:flex;flex-wrap:wrap;gap:6px" id="color-picker">
+            ${COLOR_PALETTES.map((c,i)=>`<button onclick="selectColor(${i},this)"
+              style="width:28px;height:28px;border-radius:6px;border:3px solid ${i===0?'var(--p)':'var(--border)'};
+              background:${c.bg};cursor:pointer" data-ci="${i}" title="${c.color}"></button>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div style="padding:0 16px 16px;display:flex;justify-content:flex-end">
+        <button onclick="addNewMember()"
+          style="background:var(--p);color:#fff;border:none;padding:9px 22px;border-radius:20px;
+          font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+          ➕ Tambahkan ke Tim
+        </button>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;padding:10px 14px;background:var(--yl);border-radius:var(--r);font-size:12px;color:var(--yd)">
+      💡 Anggota baru langsung muncul di Dashboard. Gunakan tab <strong>KPI per Anggota</strong>
+      untuk menambahkan metrik KPI-nya. Tambahkan juga kredensial login di sheet <strong>users</strong> di Google Sheets.
+    </div>`;
+
+  // Set default selection
+  window._selectedAvatar = AVATAR_OPTIONS[0];
+  window._selectedColorIdx = 0;
+}
+
+function selectAvatar(avatar, btn){
+  window._selectedAvatar = avatar;
+  document.querySelectorAll('#avatar-picker button').forEach(b=>{
+    b.style.borderColor = b.dataset.avatar===avatar?'var(--p)':'var(--border)';
+    b.style.background  = b.dataset.avatar===avatar?'var(--pl)':'#fff';
+  });
+}
+
+function selectColor(ci, btn){
+  window._selectedColorIdx = ci;
+  document.querySelectorAll('#color-picker button').forEach(b=>{
+    b.style.borderColor = parseInt(b.dataset.ci)===ci?'var(--p)':'var(--border)';
+  });
+}
+
+function addNewMember(){
+  const name = document.getElementById('new-member-name').value.trim();
+  const role = document.getElementById('new-member-role').value.trim();
+  if(!name){ showToast('⚠️ Nama anggota wajib diisi.'); return; }
+  if(!role){ showToast('⚠️ Role / jabatan wajib diisi.'); return; }
+
+  const animal   = window._selectedAvatar || '🐶';
+  const ci       = window._selectedColorIdx || 0;
+  const palette  = COLOR_PALETTES[ci] || COLOR_PALETTES[0];
+  const id       = name.toLowerCase().replace(/[^a-z0-9]/g,'_')+'_'+Date.now().toString(36);
+  const badgeLabel = role.split(' ').map(w=>w[0]||'').join('').slice(0,4).toUpperCase() || name.slice(0,4);
+
+  const newPic = {
+    id,
+    name,
+    role,
+    animal,
+    abg:    palette.bg,
+    badge:  badgeLabel,
+    bstyle: `background:${palette.bg};color:${palette.color};`,
+    metrics: []
+  };
+
+  PICS.push(newPic);
+
+  // Update PIC_STYLES dan ROLE_COLORS
+  PIC_STYLES[name] = { animal, bg: palette.bg, color: palette.color };
+  ROLE_COLORS[role] = `background:${palette.bg};color:${palette.color};`;
+
+  // Tambah ke settingsData
+  settingsData.push({ id, metrics: [] });
+
+  // Sync ke Sheets — simpan member baru ke kpi_settings (tanpa metric = row placeholder)
+  // Tidak perlu entry khusus — applySettings akan sync semua
+
+  showToast('✅ '+name+' berhasil ditambahkan ke tim!');
+
+  // Re-render semua bagian yang bergantung PICS
+  renderCards();
+  renderOverview();
+  rebuildForecastMetricSelect();
+  renderMembersSettings();
+  renderSettings();
+
+  // Sync ke Sheets
+  syncMembersToSheets();
+}
+
+function deleteMember(picId){
+  const pic = PICS.find(p=>p.id===picId);
+  if(!pic){ showToast('⚠️ Anggota tidak ditemukan.'); return; }
+
+  // Tampilkan konfirmasi
+  const overlay=document.createElement('div');
+  overlay.id='delete-member-confirm';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.innerHTML=`
+    <div style="background:#fff;border-radius:16px;padding:28px 24px;max-width:360px;width:100%;text-align:center">
+      <div style="font-size:36px;margin-bottom:12px">⚠️</div>
+      <div style="font-size:15px;font-weight:700;color:var(--tx);margin-bottom:8px">Hapus Anggota?</div>
+      <div style="font-size:13px;color:var(--tx2);margin-bottom:22px;line-height:1.6">
+        <strong>${pic.name}</strong> akan dihapus dari dashboard.<br>
+        Data histori KPI-nya tetap tersimpan di Sheets.
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button onclick="document.getElementById('delete-member-confirm').remove()"
+          style="padding:9px 22px;border:1.5px solid var(--border);border-radius:10px;
+          background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--tx2)">Batal</button>
+        <button onclick="confirmDeleteMember('${picId}')"
+          style="padding:9px 22px;background:var(--red);color:#fff;border:none;border-radius:10px;
+          font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Hapus</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+function confirmDeleteMember(picId){
+  const existing=document.getElementById('delete-member-confirm');
+  if(existing) existing.remove();
+
+  const pic=PICS.find(p=>p.id===picId);
+  if(!pic) return;
+
+  // Hapus dari PICS
+  const idx=PICS.findIndex(p=>p.id===picId);
+  if(idx>=0) PICS.splice(idx,1);
+
+  // Hapus dari settingsData
+  const si=settingsData.findIndex(s=>s.id===picId);
+  if(si>=0) settingsData.splice(si,1);
+
+  // Hapus dari picInputPeriod dan picSelectedLabel
+  Object.keys(picInputPeriod).forEach(k=>{ if(k===picId) delete picInputPeriod[k]; });
+  Object.keys(picSelectedLabel).forEach(k=>{ if(k.startsWith(picId+'_')) delete picSelectedLabel[k]; });
+
+  showToast('🗑 '+pic.name+' dihapus dari tim.');
+
+  renderCards();
+  renderOverview();
+  rebuildForecastMetricSelect();
+  renderMembersSettings();
+  renderSettings();
+
+  // Sync ke Sheets
+  syncMembersToSheets();
+}
+
 /* INIT */
 async function init(){
   // Step 1: Stamp type ke metrics
@@ -3047,6 +3356,8 @@ function syncSettingsDataFromPICS(){
 async function refreshFromSheets(){
   // Background fetch — dashboard sudah tampil, ini hanya update data
   try {
+    // Load members PERTAMA agar PICS terisi sebelum kpi_settings diapply
+    await loadMembersFromSheets();
     await loadDashboardConfigFromSheets();
     await loadKpiSettingsFromSheets();
     syncSettingsDataFromPICS();
