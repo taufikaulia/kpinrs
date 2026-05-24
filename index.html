@@ -277,6 +277,36 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
   font-family:inherit;transition:all .2s}
 .dc-add-btn:hover{border-color:var(--p);color:var(--p)}
 
+.guide-nav-btn{display:inline-block;padding:5px 12px;background:var(--p);color:#fff;
+  border-radius:20px;font-size:11px;font-weight:700;text-decoration:none;transition:background .2s}
+.guide-nav-btn:hover{background:var(--pd)}
+.guide-section{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  margin-bottom:16px;overflow:hidden;box-shadow:var(--sh)}
+.guide-section-hd{display:flex;align-items:center;gap:12px;padding:14px 18px;
+  background:var(--pl);border-bottom:1px solid var(--border);
+  font-size:15px;font-weight:700;color:var(--pd)}
+.guide-num{width:28px;height:28px;border-radius:50%;background:var(--p);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0}
+.guide-body{padding:16px 20px;font-size:13px;color:var(--tx);line-height:1.7}
+.guide-body p{margin:0 0 12px}
+.guide-sub-title{font-size:12px;font-weight:700;color:var(--p);text-transform:uppercase;
+  letter-spacing:.05em;margin:16px 0 8px}
+.guide-step-list{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}
+.guide-step{display:flex;align-items:flex-start;gap:10px;font-size:13px}
+.guide-step-num{width:22px;height:22px;border-radius:50%;background:var(--pl);color:var(--p);
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;
+  flex-shrink:0;margin-top:2px}
+.guide-note{padding:10px 14px;background:var(--yl);border-radius:var(--rs);
+  font-size:12px;color:var(--yd);margin:12px 0;border-left:3px solid #F5D898}
+.guide-method-card{padding:8px 12px;background:#F8F7FE;border-radius:var(--rs);
+  font-size:12px;border-left:3px solid var(--p)}
+.guide-faq{margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #F0EFF8}
+.guide-faq:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.guide-q{font-weight:700;color:var(--tx);margin-bottom:5px;font-size:13px}
+.guide-a{font-size:12px;color:var(--tx2);line-height:1.6}
+kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-radius:4px;
+  font-size:11px;background:#F8F7FE;font-family:monospace}
+
 /* ============================================================
    MOBILE RESPONSIVE
    ============================================================ */
@@ -451,6 +481,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
     <button class="main-tab" id="mtab-history" onclick="switchTab('history')">🕓 Histori KPI</button>
     <button class="main-tab" id="mtab-forecast" onclick="switchTab('forecast')">🔮 Proyeksi & Forecasting</button>
     <button class="main-tab" id="mtab-settings" onclick="switchTab('settings')">⚙️ Pengaturan KPI</button>
+    <button class="main-tab" id="mtab-guide" onclick="switchTab('guide')">📖 Panduan</button>
   </div>
 
   <!-- PANEL: Dashboard -->
@@ -759,6 +790,324 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
   </div>
 
 </div>
+
+  <!-- PANEL: Panduan -->
+  <div class="tab-panel" id="panel-guide">
+  <div class="mc" style="max-width:860px">
+
+    <!-- Header -->
+    <div style="text-align:center;padding:32px 20px 24px">
+      <div style="font-size:48px;margin-bottom:12px">📖</div>
+      <h1 style="font-size:24px;font-weight:800;color:var(--pd);margin:0 0 8px">Panduan Narasi KPI Dashboard</h1>
+      <p style="font-size:14px;color:var(--tx2);margin:0">Petunjuk lengkap penggunaan dashboard untuk tim Digital Marketing Narasi.tv</p>
+    </div>
+
+    <!-- Quick Nav -->
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px;padding:16px;background:var(--pl);border-radius:var(--r)">
+      <span style="font-size:11px;font-weight:700;color:var(--p);width:100%;margin-bottom:4px">DAFTAR ISI</span>
+      <a href="#g-login" class="guide-nav-btn">① Login</a>
+      <a href="#g-dashboard" class="guide-nav-btn">② Dashboard</a>
+      <a href="#g-input" class="guide-nav-btn">③ Input KPI</a>
+      <a href="#g-history" class="guide-nav-btn">④ Histori</a>
+      <a href="#g-forecast" class="guide-nav-btn">⑤ Forecasting</a>
+      <a href="#g-settings" class="guide-nav-btn">⑥ Pengaturan</a>
+      <a href="#g-members" class="guide-nav-btn">⑦ Anggota Tim</a>
+      <a href="#g-dashconfig" class="guide-nav-btn">⑧ Konfigurasi Dashboard</a>
+      <a href="#g-sheets" class="guide-nav-btn">⑨ Google Sheets</a>
+      <a href="#g-faq" class="guide-nav-btn">⑩ FAQ</a>
+    </div>
+
+    <!-- Section 1: Login -->
+    <div class="guide-section" id="g-login">
+      <div class="guide-section-hd">
+        <span class="guide-num">①</span>
+        <span>Login ke Dashboard</span>
+      </div>
+      <div class="guide-body">
+        <p>Buka URL dashboard di browser. Anda akan melihat halaman login.</p>
+        <div class="guide-step-list">
+          <div class="guide-step">
+            <span class="guide-step-num">1</span>
+            <div>Masukkan <strong>Username</strong> dan <strong>Password</strong> yang diberikan admin.</div>
+          </div>
+          <div class="guide-step">
+            <span class="guide-step-num">2</span>
+            <div>Klik <strong>Masuk ke Dashboard</strong> atau tekan <kbd>Enter</kbd>.</div>
+          </div>
+          <div class="guide-step">
+            <span class="guide-step-num">3</span>
+            <div>Dashboard akan terbuka. Data dimuat dari server di background — tunggu sebentar hingga data terbaru muncul.</div>
+          </div>
+        </div>
+        <div class="guide-note">
+          💡 <strong>Lupa password?</strong> Hubungi admin untuk reset di sheet <code>users</code> di Google Sheets.
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Dashboard Utama -->
+    <div class="guide-section" id="g-dashboard">
+      <div class="guide-section-hd">
+        <span class="guide-num">②</span>
+        <span>Halaman Dashboard Utama</span>
+      </div>
+      <div class="guide-body">
+        <p>Dashboard utama terdiri dari tiga area:</p>
+
+        <div class="guide-sub-title">📊 Summary Cards</div>
+        <p>Menampilkan ringkasan metrik utama. Card pertama selalu menunjukkan jumlah KPI yang <em>on track</em> vs total metrik. Card lainnya ditentukan lewat <strong>Konfigurasi Dashboard</strong> berdasarkan Metrics Group yang Anda buat.</p>
+
+        <div class="guide-sub-title">📈 Grafik Tren</div>
+        <p>Menampilkan tren historis metrik dari data yang telah disubmit. Pilih tab grafik (sesuai Metrics Group) dan gunakan filter periode di atas untuk mengubah rentang waktu tampilan. Klik <strong>📅 Weekly</strong> atau <strong>📆 Monthly</strong> untuk beralih tipe periode.</p>
+
+        <div class="guide-sub-title">🗓 Filter Periode Overview</div>
+        <div class="guide-step-list">
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>4 / 8 / 12 Periode Terakhir</strong> — preset cepat</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Rentang Kustom</strong> — pilih periode awal dan akhir secara bebas</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Input KPI -->
+    <div class="guide-section" id="g-input">
+      <div class="guide-section-hd">
+        <span class="guide-num">③</span>
+        <span>Input KPI per Anggota Tim</span>
+      </div>
+      <div class="guide-body">
+        <p>Di bawah grafik terdapat kartu KPI untuk setiap anggota tim. Setiap anggota mengisi KPI-nya sendiri.</p>
+
+        <div class="guide-sub-title">Cara Input KPI Mingguan</div>
+        <div class="guide-step-list">
+          <div class="guide-step"><span class="guide-step-num">1</span><div>Pastikan tab <strong>📅 Weekly</strong> aktif di kartu anggota yang ingin diisi.</div></div>
+          <div class="guide-step"><span class="guide-step-num">2</span><div>Dropdown periode otomatis menunjuk ke <strong>minggu berjalan</strong> (Senin–Minggu). Untuk mengisi minggu lain, pilih dari dropdown.</div></div>
+          <div class="guide-step"><span class="guide-step-num">3</span><div>Jika belum ada data, klik <strong>✏️ Isi KPI</strong>. Form input akan muncul.</div></div>
+          <div class="guide-step"><span class="guide-step-num">4</span><div>Isi kolom <strong>Aktual</strong> dengan nilai pencapaian nyata. Kolom <strong>Target</strong> sudah terisi default — ubah jika perlu.</div></div>
+          <div class="guide-step"><span class="guide-step-num">5</span><div>Kolom <strong>Status</strong> akan otomatis berubah: <span style="color:var(--green)">● On Track</span>, <span style="color:var(--amber)">● Warning</span>, atau <span style="color:var(--red)">● Off Track</span>.</div></div>
+          <div class="guide-step"><span class="guide-step-num">6</span><div>Kolom <strong>vs Lalu</strong> menampilkan perbandingan dengan periode sebelumnya secara otomatis (butuh data periode sebelumnya).</div></div>
+          <div class="guide-step"><span class="guide-step-num">7</span><div>Klik <strong>📨 Simpan Data</strong> untuk menyimpan ke histori dan Google Sheets.</div></div>
+        </div>
+
+        <div class="guide-sub-title">Cara Input KPI Bulanan</div>
+        <p>Sama seperti mingguan — klik tab <strong>📆 Monthly</strong> di kartu anggota, lalu ikuti langkah yang sama.</p>
+
+        <div class="guide-sub-title">Edit Data yang Sudah Disubmit</div>
+        <p>Pilih periode yang sudah punya data dari dropdown → data tampil dalam mode <em>read-only</em> → klik <strong>✏️ Edit Data</strong> di pojok kanan bawah tabel → ubah nilai → klik <strong>✓ Perbarui Data</strong>.</p>
+
+        <div class="guide-note">
+          💡 Jika Anda submit ulang periode yang sudah ada data, akan muncul konfirmasi <em>"Perbarui Data?"</em>. Data lama akan ditimpa.
+        </div>
+
+        <div class="guide-sub-title">Kolom Summary di Bawah Tabel</div>
+        <p>Setelah tabel KPI, muncul ringkasan otomatis yang menunjukkan tiap metrik: apakah melampaui target, di bawah target, dan naik/turun berapa persen dibanding periode sebelumnya.</p>
+      </div>
+    </div>
+
+    <!-- Section 4: Histori -->
+    <div class="guide-section" id="g-history">
+      <div class="guide-section-hd">
+        <span class="guide-num">④</span>
+        <span>Histori KPI</span>
+      </div>
+      <div class="guide-body">
+        <p>Tab <strong>🕓 Histori KPI</strong> menampilkan rekap semua data yang sudah disubmit.</p>
+        <div class="guide-step-list">
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Filter</strong> — saring berdasarkan periode atau anggota tim menggunakan dropdown filter di atas tabel.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Edit</strong> — klik ✏️ pada baris untuk membuka modal edit dan mengubah nilai aktual, target, atau catatan.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Hapus</strong> — klik ✕ untuk menghapus entri dari histori lokal. Data di Google Sheets juga ikut terhapus.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Export CSV</strong> — klik tombol <strong>⬇ Export CSV</strong> di topbar untuk mengunduh seluruh data dashboard.</div></div>
+        </div>
+        <div class="guide-note">
+          ⚠️ Data histori dimuat ulang dari Google Sheets setiap kali tab Histori dibuka. Jika data belum muncul, tunggu sebentar.
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5: Forecasting -->
+    <div class="guide-section" id="g-forecast">
+      <div class="guide-section-hd">
+        <span class="guide-num">⑤</span>
+        <span>Proyeksi & Forecasting</span>
+      </div>
+      <div class="guide-body">
+        <p>Tab <strong>🔮 Proyeksi & Forecasting</strong> memungkinkan prediksi nilai KPI ke depan berdasarkan data historis.</p>
+
+        <div class="guide-sub-title">Cara Menggunakan</div>
+        <div class="guide-step-list">
+          <div class="guide-step"><span class="guide-step-num">1</span><div>Pilih <strong>metrik</strong> yang ingin di-forecast dari dropdown.</div></div>
+          <div class="guide-step"><span class="guide-step-num">2</span><div>Pilih <strong>metode forecasting</strong>:</div></div>
+        </div>
+        <div style="margin:10px 0 10px 32px;display:grid;gap:8px">
+          <div class="guide-method-card"><strong>📈 Linear Regression</strong> — tren garis lurus. Cocok untuk data yang naik/turun konsisten.</div>
+          <div class="guide-method-card"><strong>〰️ Moving Average</strong> — rata-rata 3 periode terakhir. Cocok untuk data stabil.</div>
+          <div class="guide-method-card"><strong>🔄 Exp. Smoothing (Holt)</strong> — bobot lebih besar ke data terbaru. Cocok untuk data dengan tren yang berubah.</div>
+          <div class="guide-method-card"><strong>🚀 Growth Rate (CAGR)</strong> — proyeksi berbasis rata-rata pertumbuhan historis. Cocok untuk data yang tumbuh konsisten.</div>
+        </div>
+        <div class="guide-step-list">
+          <div class="guide-step"><span class="guide-step-num">3</span><div>Pilih <strong>horizon</strong> — berapa periode ke depan yang ingin diproyeksikan (3, 6, 9, atau 12).</div></div>
+          <div class="guide-step"><span class="guide-step-num">4</span><div>Klik <strong>🔮 Jalankan Forecast</strong>.</div></div>
+          <div class="guide-step"><span class="guide-step-num">5</span><div>Lihat grafik, tabel detail dengan <em>confidence level</em>, dan insight otomatis.</div></div>
+          <div class="guide-step"><span class="guide-step-num">6</span><div>Klik <strong>⬇ Export Hasil</strong> untuk mengunduh hasil forecast sebagai CSV.</div></div>
+        </div>
+        <div class="guide-note">💡 <strong>Confidence level</strong> menurun seiring bertambahnya horizon. Proyeksi 3–6 periode ke depan lebih andal dari 12 periode.</div>
+      </div>
+    </div>
+
+    <!-- Section 6: Pengaturan KPI -->
+    <div class="guide-section" id="g-settings">
+      <div class="guide-section-hd">
+        <span class="guide-num">⑥</span>
+        <span>Pengaturan KPI per Anggota</span>
+      </div>
+      <div class="guide-body">
+        <p>Tab <strong>⚙️ Pengaturan KPI → KPI per Anggota</strong> untuk mengatur metrik, target, dan tipe data tiap anggota.</p>
+        <div class="guide-step-list">
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Pilih anggota</strong> — klik tab nama anggota di bagian atas.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Nama Metrik</strong> — ubah nama metrik sesuai kebutuhan.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Tipe Data</strong> — pilih <em>💰 Rupiah</em>, <em>📊 Persen (%)</em>, atau <em>🔢 Angka</em>. Tipe ini menentukan format tampilan dan placeholder input.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Target Weekly / Monthly</strong> — isi nilai target untuk tiap periode.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>↓ Lebih Kecil = Baik</strong> — centang untuk metrik seperti CPC atau Ad Spend. Status <em>on track</em> akan dihitung terbalik.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Centang aktif (✓)</strong> — hapus centang untuk menonaktifkan metrik tanpa menghapusnya.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>+ Tambah Metrik</strong> — tambah baris metrik baru untuk anggota tersebut.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>✕</strong> — hapus metrik (tidak bisa di-undo).</div></div>
+        </div>
+        <div class="guide-note">⚠️ Klik <strong>✓ Simpan Pengaturan</strong> di pojok kanan atas setelah selesai mengubah. Perubahan belum tersimpan sebelum diklik.</div>
+      </div>
+    </div>
+
+    <!-- Section 7: Anggota Tim -->
+    <div class="guide-section" id="g-members">
+      <div class="guide-section-hd">
+        <span class="guide-num">⑦</span>
+        <span>Manajemen Anggota Tim</span>
+      </div>
+      <div class="guide-body">
+        <p>Tab <strong>⚙️ Pengaturan KPI → 👥 Anggota Tim</strong> untuk menambah atau menghapus anggota.</p>
+
+        <div class="guide-sub-title">Tambah Anggota Baru</div>
+        <div class="guide-step-list">
+          <div class="guide-step"><span class="guide-step-num">1</span><div>Isi <strong>Nama</strong> dan <strong>Role / Jabatan</strong>.</div></div>
+          <div class="guide-step"><span class="guide-step-num">2</span><div>Pilih <strong>Avatar</strong> dan <strong>Warna Badge</strong>.</div></div>
+          <div class="guide-step"><span class="guide-step-num">3</span><div>Klik <strong>➕ Tambahkan ke Tim</strong>.</div></div>
+          <div class="guide-step"><span class="guide-step-num">4</span><div>Anggota baru langsung muncul di Dashboard. Data tersimpan otomatis ke Google Sheets.</div></div>
+        </div>
+        <div class="guide-note">
+          ⚠️ <strong>Penting:</strong> Setelah menambah anggota baru, admin perlu menambahkan kredensial login anggota tersebut secara manual di sheet <code>users</code> di Google Sheets (kolom: username, password, name, TRUE).
+        </div>
+
+        <div class="guide-sub-title">Hapus Anggota</div>
+        <p>Klik <strong>✕ Hapus</strong> di samping nama anggota → konfirmasi → anggota dihapus dari dashboard. <em>Data histori KPI-nya tetap tersimpan di Google Sheets</em>.</p>
+      </div>
+    </div>
+
+    <!-- Section 8: Konfigurasi Dashboard -->
+    <div class="guide-section" id="g-dashconfig">
+      <div class="guide-section-hd">
+        <span class="guide-num">⑧</span>
+        <span>Konfigurasi Dashboard</span>
+      </div>
+      <div class="guide-body">
+        <p>Tab <strong>⚙️ Pengaturan KPI → 📊 Konfigurasi Dashboard</strong> untuk mengatur apa yang tampil di summary cards dan grafik tren.</p>
+
+        <div class="guide-sub-title">Metrics Group</div>
+        <p>Setiap <em>Metrics Group</em> menjadi satu <strong>summary card</strong> dan satu <strong>tab grafik</strong> di halaman utama.</p>
+        <div class="guide-step-list">
+          <div class="guide-step"><span class="guide-step-num">1</span><div>Klik <strong>+ Buat Metrics Group Baru</strong>.</div></div>
+          <div class="guide-step"><span class="guide-step-num">2</span><div>Ubah nama group (contoh: "Revenue", "Traffic", "Ads").</div></div>
+          <div class="guide-step"><span class="guide-step-num">3</span><div>Pilih metrik dari dropdown <em>"+ Tambah metrik ke group ini..."</em>. Bisa pilih metrik dari anggota berbeda.</div></div>
+          <div class="guide-step"><span class="guide-step-num">4</span><div>Klik ✕ di chip metrik untuk menghapus dari group.</div></div>
+          <div class="guide-step"><span class="guide-step-num">5</span><div>Klik <strong>💾 Simpan Konfigurasi</strong> agar tersimpan ke Google Sheets.</div></div>
+        </div>
+        <div class="guide-note">💡 Summary card menampilkan total/rata-rata semua metrik dalam group untuk periode terakhir. Grafik menampilkan tren tiap metrik dalam group secara multi-line.</div>
+
+        <div class="guide-sub-title">Filter Waktu</div>
+        <p>Filter periode di atas summary cards berlaku untuk seluruh overview — gunakan toggle Weekly/Monthly dan preset 4/8/12 periode atau rentang kustom.</p>
+      </div>
+    </div>
+
+    <!-- Section 9: Google Sheets -->
+    <div class="guide-section" id="g-sheets">
+      <div class="guide-section-hd">
+        <span class="guide-num">⑨</span>
+        <span>Koneksi Google Sheets</span>
+      </div>
+      <div class="guide-body">
+        <p>Dashboard tersinkronisasi dengan Google Sheets melalui Google Apps Script. Berikut daftar sheet dan fungsinya:</p>
+        <div style="overflow-x:auto;margin:12px 0">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="background:var(--pl)">
+                <th style="padding:8px 12px;text-align:left;border-bottom:2px solid var(--border);font-weight:700;color:var(--p)">Sheet</th>
+                <th style="padding:8px 12px;text-align:left;border-bottom:2px solid var(--border);font-weight:700;color:var(--p)">Isi</th>
+                <th style="padding:8px 12px;text-align:left;border-bottom:2px solid var(--border);font-weight:700;color:var(--p)">Diupdate saat</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>users</code></td><td style="padding:8px 12px">Kredensial login</td><td style="padding:8px 12px">Manual oleh admin</td></tr>
+              <tr style="background:#FAFAFE;border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>sessions</code></td><td style="padding:8px 12px">Token login aktif</td><td style="padding:8px 12px">Otomatis saat login/logout</td></tr>
+              <tr style="border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>kpi_entries</code></td><td style="padding:8px 12px">Data KPI yang disubmit</td><td style="padding:8px 12px">Saat klik Simpan Data</td></tr>
+              <tr style="background:#FAFAFE;border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>kpi_settings</code></td><td style="padding:8px 12px">Konfigurasi metrik & target</td><td style="padding:8px 12px">Saat klik Simpan Pengaturan</td></tr>
+              <tr style="border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>team_members</code></td><td style="padding:8px 12px">Daftar anggota tim</td><td style="padding:8px 12px">Saat tambah/hapus anggota</td></tr>
+              <tr style="background:#FAFAFE;border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>dashboard_config</code></td><td style="padding:8px 12px">Metrics groups & filter</td><td style="padding:8px 12px">Saat klik Simpan Konfigurasi</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="guide-note">
+          💡 Data dimuat dari Sheets di background setelah login. Jika ada perubahan oleh anggota lain, refresh halaman untuk mendapatkan data terbaru.
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 10: FAQ -->
+    <div class="guide-section" id="g-faq">
+      <div class="guide-section-hd">
+        <span class="guide-num">⑩</span>
+        <span>FAQ — Pertanyaan Umum</span>
+      </div>
+      <div class="guide-body">
+        <div class="guide-faq">
+          <div class="guide-q">Data yang saya input hilang setelah refresh halaman.</div>
+          <div class="guide-a">Pastikan Anda sudah klik <strong>📨 Simpan Data</strong> sebelum menutup atau refresh halaman. Data yang belum disubmit hanya tersimpan sementara di browser.</div>
+        </div>
+        <div class="guide-faq">
+          <div class="guide-q">Kolom "vs Lalu" kosong / menampilkan "–".</div>
+          <div class="guide-a">Kolom ini membutuhkan data dari periode sebelumnya. Pastikan periode sebelumnya sudah diisi dan disubmit terlebih dahulu.</div>
+        </div>
+        <div class="guide-faq">
+          <div class="guide-q">Summary card dan grafik tidak muncul.</div>
+          <div class="guide-a">Buka <strong>⚙️ Pengaturan KPI → 📊 Konfigurasi Dashboard</strong>, buat Metrics Group, tambahkan metrik, lalu klik Simpan Konfigurasi.</div>
+        </div>
+        <div class="guide-faq">
+          <div class="guide-q">Muncul error "Tidak bisa terhubung ke server".</div>
+          <div class="guide-a">Periksa koneksi internet. Jika koneksi normal, kemungkinan Apps Script sedang bermasalah — coba refresh halaman beberapa menit kemudian. Hubungi admin jika berlanjut.</div>
+        </div>
+        <div class="guide-faq">
+          <div class="guide-q">Periode minggu berjalan tidak muncul di dropdown.</div>
+          <div class="guide-a">Dashboard otomatis memperbarui daftar periode saat dibuka. Coba refresh halaman untuk memastikan daftar periode up-to-date.</div>
+        </div>
+        <div class="guide-faq">
+          <div class="guide-q">Saya submit KPI dua kali untuk periode yang sama.</div>
+          <div class="guide-a">Dashboard akan menampilkan konfirmasi "Perbarui Data?" — data lama akan ditimpa dengan data baru. Tidak ada duplikasi di Google Sheets.</div>
+        </div>
+        <div class="guide-faq">
+          <div class="guide-q">Anggota baru tidak bisa login.</div>
+          <div class="guide-a">Admin perlu menambahkan kredensial login secara manual di sheet <code>users</code>: isi username, password, nama, dan <code>TRUE</code> di kolom active.</div>
+        </div>
+        <div class="guide-faq">
+          <div class="guide-q">Bagaimana cara logout?</div>
+          <div class="guide-a">Klik tombol <strong>Keluar</strong> di pojok kanan atas topbar. Sesi akan berakhir dan Anda kembali ke halaman login.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:24px;color:var(--tx3);font-size:12px;border-top:1px solid var(--border);margin-top:8px">
+      Narasi KPI Dashboard — Internal Tool Digital Marketing Team<br>
+      Pertanyaan lebih lanjut: hubungi admin dashboard.
+    </div>
+
+  </div>
+  </div>
+
 
 <!-- MODAL -->
 <div class="modal-overlay" id="edit-modal">
@@ -2629,7 +2978,7 @@ function addTrendTab(){ addGroup(); }
 
 /* TABS */
 function switchTab(tab){
-  ['dashboard','history','forecast','settings'].forEach(t=>{
+  ['dashboard','history','forecast','settings','guide'].forEach(t=>{
     const panel = document.getElementById('panel-'+t);
     const btn   = document.getElementById('mtab-'+t);
     if(panel) panel.classList.toggle('active', t===tab);
