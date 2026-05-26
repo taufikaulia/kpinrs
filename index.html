@@ -590,11 +590,11 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
         <thead><tr>
           <th style="width:130px">PIC</th>
           <th>Objective / Metrik</th>
-          <th class="r" style="width:170px">Target</th>
-          <th class="r" style="width:170px">Aktual</th>
-          <th class="c" style="width:110px">Growth</th>
+          <th class="r" style="width:130px">Target</th>
+          <th class="r" style="width:130px">Aktual</th>
+          <th class="c" style="width:100px">Growth</th>
           <th class="c" style="width:80px">Status</th>
-          <th class="c" style="width:100px">Aksi</th>
+          <th class="c" style="width:80px">Aksi</th>
         </tr></thead>
         <tbody id="hist-tbody"></tbody>
       </table>
@@ -1623,6 +1623,56 @@ async function loadHistoryFromSheets(){
    HISTORY RENDER
    ============================================================ */
 
+/* ============================================================
+   HISTORY CONTROLS
+   ============================================================ */
+
+function setHistPeriod(p){
+  ui.histPeriod = p;
+  document.getElementById('hbtn-weekly').classList.toggle('active', p==='weekly');
+  document.getElementById('hbtn-monthly').classList.toggle('active', p==='monthly');
+  renderHistory();
+}
+
+function applyFilter(){
+  const periodEl = document.getElementById('hf-period');
+  const picEl    = document.getElementById('hf-pic');
+  ui.filterPeriod = periodEl ? periodEl.value : '';
+  ui.filterPic    = picEl    ? picEl.value    : '';
+  renderHistory();
+}
+
+function resetFilter(){
+  ui.filterPeriod = '';
+  ui.filterPic    = '';
+  const periodEl = document.getElementById('hf-period');
+  const picEl    = document.getElementById('hf-pic');
+  if(periodEl) periodEl.value = '';
+  if(picEl)    picEl.value    = '';
+  renderHistory();
+}
+
+function exportHistCSV(){
+  let data = [...historyData];
+  if(ui.histPeriod)   data = data.filter(r=>r.periodType===ui.histPeriod);
+  if(ui.filterPeriod) data = data.filter(r=>r.period===ui.filterPeriod);
+  if(ui.filterPic)    data = data.filter(r=>r.pic===ui.filterPic);
+
+  let csv = 'Histori KPI Narasi.tv\n';
+  csv += 'Periode,PIC,Role,Metrik,Target,Aktual,Growth %,Status,Catatan\n';
+  data.forEach(r=>{
+    const g = calcGrowth(r.actual, r.prev);
+    const gStr = g!==null ? g.toFixed(1)+'%' : '–';
+    const status = getStatus(r.actual, r.target, !!r.lowerBetter);
+    csv += '"'+r.period+'","'+r.pic+'","'+r.role+'","'+r.obj+'","'
+      +(r.target||'–')+'","'+(r.actual||'–')+'","'+gStr+'","'
+      +status+'","'+(r.notes||'').replace(/"/g,"'")+'"\n';
+  });
+  dlCSV(csv, 'narasi_histori_kpi_'+today()+'.csv');
+  showToast('✅ CSV Histori berhasil diunduh!');
+}
+
+
 function renderHistory(){
   // Filter data
   let data=[...historyData];
@@ -1640,10 +1690,22 @@ function renderHistory(){
   });
   const pct=totEntries>0?Math.round(ontrackCount/totEntries*100):0;
   const setStat=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
-  setStat('hs-entries', totEntries);
-  setStat('hs-ontrack', pct+'%');
-  setStat('hs-revenue', totRev>0?'Rp '+(totRev/1000000).toFixed(1)+' Jt':'–');
-  setStat('hs-traffic', totTraffic>0?(totTraffic/1000).toFixed(0)+' Rb':'–');
+  // Hitung on track dan off track
+  let totOntrack=0, totOfftrack=0;
+  data.forEach(r=>{
+    if(!r.actual||r.actual==='–') return;
+    const s=getStatus(r.actual,r.target,!!r.lowerBetter);
+    if(s==='green') totOntrack++;
+    else if(s==='red') totOfftrack++;
+  });
+  // Rata-rata growth
+  const growths=data.map(r=>calcGrowth(r.actual,r.prev)).filter(g=>g!==null);
+  const avgGrowth=growths.length?growths.reduce((a,b)=>a+b,0)/growths.length:null;
+
+  setStat('hs-total',    totEntries);
+  setStat('hs-ontrack',  totOntrack>0?totOntrack:'–');
+  setStat('hs-offtrack', totOfftrack>0?totOfftrack:'–');
+  setStat('hs-growth',   avgGrowth!==null?(avgGrowth>0?'+':'')+avgGrowth.toFixed(1)+'%':'–');
 
   // Group by period
   const groups={};
@@ -1680,16 +1742,20 @@ function renderHistory(){
       else if(g<-0.5) gb='<span class="gbadge neg">▼ -'+Math.abs(g).toFixed(1)+'%</span>';
       else gb='<span class="gbadge zero">≈ 0%</span>';
       html+=`<tr style="background:${bg}">
-        <td><div class="pic-chip" style="background:${ps.bg};color:${ps.color}">${ps.animal} ${r.pic}</div>
-            <div class="role-badge" style="${rs}">${r.role}</div></td>
-        <td><div class="obj-text">${r.obj||r.key}</div></td>
-        <td class="r"><span class="val-actual">${r.actual||'–'}</span></td>
-        <td class="r"><span class="val-target">${r.target||'–'}</span></td>
-        <td class="c">${tlPill(status)}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <div class="pic-chip" style="background:${ps.bg};color:${ps.color};white-space:nowrap">${ps.animal} ${r.pic}</div>
+          </div>
+          <div class="role-badge" style="${rs};margin-top:3px;display:inline-block">${r.role}</div>
+        </td>
+        <td><div style="font-size:13px;color:var(--tx);line-height:1.4">${r.obj||r.key}</div></td>
+        <td class="r" style="font-size:13px;font-weight:600;color:var(--p)">${r.target||'–'}</td>
+        <td class="r" style="font-size:13px;color:var(--tx)">${r.actual||'–'}</td>
         <td class="c">${gb}</td>
-        <td class="c">
-          <button class="edit-btn" onclick="openEditModal(${r.id})">✏</button>
-          <button class="del-btn" onclick="deleteRow(${r.id})">✕</button>
+        <td class="c">${tlPill(status)}</td>
+        <td class="c" style="white-space:nowrap">
+          <button class="edit-btn" onclick="openEditModal(${r.id})" title="Edit">✏</button>
+          <button class="del-btn" onclick="deleteRow(${r.id})" title="Hapus">✕</button>
         </td>
       </tr>`;
     });
@@ -1699,8 +1765,8 @@ function renderHistory(){
   // Populate filter dropdowns
   const periods2=[...new Set(historyData.map(r=>r.period))].sort((a,b)=>parsePeriodLabel(b)-parsePeriodLabel(a));
   const pics=[...new Set(historyData.map(r=>r.pic))].sort();
-  const fperiod=document.getElementById('filter-period');
-  const fpic=document.getElementById('filter-pic');
+  const fperiod=document.getElementById('hf-period');
+  const fpic=document.getElementById('hf-pic');
   if(fperiod) fperiod.innerHTML='<option value="">Semua Periode</option>'+periods2.map(p=>`<option value="${p}"${ui.filterPeriod===p?' selected':''}>${p}</option>`).join('');
   if(fpic) fpic.innerHTML='<option value="">Semua PIC</option>'+pics.map(p=>`<option value="${p}"${ui.filterPic===p?' selected':''}>${p}</option>`).join('');
 }
@@ -1953,18 +2019,20 @@ function renderCards(){
 
 // Ambil nilai aktual untuk suatu periodLabel — cek live state dulu, lalu histori, lalu default
 function getAvForCard(pic, m, pType, periodLabel){
+  // 1. Cek live state (data yg baru diinput, belum submit)
   const live_v = getLiveActualForLabel(m.key, pType, periodLabel);
-  if(live_v!==undefined) return live_v;
+  if(live_v !== undefined && live_v !== '') return live_v;
+  // 2. Cek historyData (data dari Sheets atau sudah disubmit)
   const hist = getHistoricActual(pic.id, m.key, periodLabel);
-  if(hist) return hist.actual;
+  if(hist && hist.actual && hist.actual !== '–') return hist.actual;
   return '–';
 }
 function getTvForCard(pic, m, pType, periodLabel){
   const live_v = getLiveTargetForLabel(m.key, pType, periodLabel);
-  if(live_v!==undefined) return live_v;
+  if(live_v !== undefined && live_v !== '') return live_v;
   const hist = getHistoricActual(pic.id, m.key, periodLabel);
-  if(hist) return hist.target;
-  return getTargetForPeriod(pic,m,pType);
+  if(hist && hist.target && hist.target !== '–') return hist.target;
+  return getTargetForPeriod(pic, m, pType);
 }
 function getNvForCard(pic, m, pType, periodLabel){
   const live_v = getLiveNotesForLabel(m.key, pType, periodLabel);
@@ -2381,12 +2449,26 @@ function buildWeeklyLabels(){
   return labels;
 }
 function buildMonthlyLabels(){
-  // Semua bulan sejak Jan 2026 sampai bulan BERJALAN (inklusif)
+  // Mulai dari bulan terlama di historyData (atau Jan 2026 jika tidak ada)
+  // sampai bulan BERJALAN
   const now=new Date();
+  const endMonth=new Date(now.getFullYear(),now.getMonth(),1);
+
+  // Temukan bulan tertua dari historyData
+  let startYear=2026, startMonth=0;
+  historyData.filter(r=>r.periodType==='monthly').forEach(r=>{
+    const match=r.period.match(/(\w+)\s+(\d{4})/);
+    if(match){
+      const mIdx=ID_MONTHS.indexOf(match[1]);
+      const yr=parseInt(match[2]);
+      if(yr<startYear||(yr===startYear&&mIdx<startMonth)){
+        startYear=yr; startMonth=mIdx<0?0:mIdx;
+      }
+    }
+  });
+
   const labels=[];
-  const start=new Date(2026,0,1);
-  const endMonth=new Date(now.getFullYear(),now.getMonth(),1); // bulan berjalan
-  const cur=new Date(start);
+  const cur=new Date(startYear,startMonth,1);
   while(cur<=endMonth){
     labels.push(ID_MONTHS[cur.getMonth()]+' '+cur.getFullYear());
     cur.setMonth(cur.getMonth()+1);
