@@ -156,9 +156,11 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .hs-lbl{font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
 .hs-val{font-size:21px;font-weight:700;color:var(--pd)}
 .hs-sub{font-size:11px;color:var(--tx3);margin-top:2px}
-.hist-period-hd{background:linear-gradient(90deg,var(--p),#6B62D4);padding:9px 16px;display:flex;align-items:center;gap:10px}
-.hist-period-lbl{font-size:12px;font-weight:700;color:#fff;letter-spacing:.03em}
-.hist-period-cnt{font-size:11px;color:rgba(255,255,255,.6);margin-left:auto}
+.hist-period-hd{background:linear-gradient(90deg,var(--p),#6B62D4);padding:11px 16px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hist-period-lbl{font-size:14px;font-weight:800;color:#fff;letter-spacing:.01em;line-height:1.2}
+.hist-period-cnt{font-size:11px;font-weight:700;color:rgba(255,255,255,.9);
+  background:rgba(255,255,255,.18);padding:3px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0}
 .hist-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)}
 /* HISTORY TABLE — card-row design */
 .hist-table{width:100%;border-collapse:collapse}
@@ -1591,7 +1593,7 @@ function exportCSV(){
 
 async function loadHistoryFromSheets(){
   const tbody=document.getElementById('hist-tbody');
-  if(tbody) tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--tx3)">⏳ Memuat data dari server...</td></tr>';
+  if(tbody) tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--tx3)">⏳ Memuat data dari server...</td></tr>';
 
   try{
     const res=await asGet({action:'load_entries'});
@@ -1748,7 +1750,7 @@ function renderHistory(){
   const tbody=document.getElementById('hist-tbody');
   if(!tbody) return;
   if(!data.length){
-    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--tx3)">Belum ada data histori.</td></tr>';
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--tx3)">Belum ada data histori.</td></tr>';
     return;
   }
 
@@ -1757,9 +1759,11 @@ function renderHistory(){
   const periods=Object.keys(groups).sort((a,b)=>parsePeriodLabel(b)-parsePeriodLabel(a));
   periods.forEach(period=>{
     const rows=groups[period];
-    html+=`<tr><td colspan="7" class="hist-period-hd">
-      <span class="hist-period-lbl">${period}</span>
-      <span class="hist-period-cnt">${rows.length} metrik</span>
+    html+=`<tr><td colspan="6" style="padding:0">
+      <div class="hist-period-hd">
+        <div class="hist-period-lbl">${period}</div>
+        <div class="hist-period-cnt">${rows.length} metrik</div>
+      </div>
     </td></tr>`;
     rows.forEach((r,i)=>{
       const bg=i%2===0?'#fff':'#FAFAFE';
