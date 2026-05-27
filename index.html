@@ -160,29 +160,48 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .hist-period-lbl{font-size:12px;font-weight:700;color:#fff;letter-spacing:.03em}
 .hist-period-cnt{font-size:11px;color:rgba(255,255,255,.6);margin-left:auto}
 .hist-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh)}
-.hist-table{width:100%;border-collapse:collapse;table-layout:fixed}
+/* HISTORY TABLE — card-row design */
+.hist-table{width:100%;border-collapse:collapse}
 .hist-table thead tr{background:#F0EFF8}
-.hist-table th{padding:9px 13px;text-align:left;font-size:10px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;border-bottom:2px solid var(--border)}
+.hist-table th{padding:8px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--tx2);
+  text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;border-bottom:2px solid var(--border)}
 .hist-table th.r{text-align:right}
 .hist-table th.c{text-align:center}
-.hist-table tbody tr{border-bottom:1px solid #F5F4FC;transition:background .12s}
-.hist-table tbody tr:last-child{border-bottom:none}
-.hist-table tbody tr:hover td{background:#F0EFFE!important}
-.hist-table td{padding:9px 13px;vertical-align:middle;overflow:hidden}
+.hist-table tbody tr.hist-row{border-bottom:1px solid #EEEDF8;transition:background .12s}
+.hist-table tbody tr.hist-row:last-child{border-bottom:none}
+.hist-table tbody tr.hist-row:hover td{background:#F5F4FC!important}
+.hist-table td{padding:10px 14px;vertical-align:middle}
 .hist-table td.r{text-align:right}
 .hist-table td.c{text-align:center}
-.pic-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px 3px 5px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
-.role-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;text-transform:uppercase;letter-spacing:.04em;margin-top:3px}
-.obj-text{font-size:12px;font-weight:500;color:var(--tx);word-break:break-word;white-space:normal}
-.gbadge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap}
+/* PIC cell */
+.pic-cell{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pic-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px 4px 6px;
+  border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;width:fit-content}
+.role-badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:6px;
+  text-transform:uppercase;letter-spacing:.05em;width:fit-content}
+.ts-label{font-size:10px;color:var(--tx3);white-space:nowrap}
+/* Metrik cell */
+.obj-cell{display:flex;flex-direction:column;gap:3px;min-width:0}
+.obj-name{font-size:13px;font-weight:600;color:var(--tx);line-height:1.4}
+.obj-notes{font-size:11px;color:var(--tx3);line-height:1.4;font-style:italic}
+/* Value cells */
+.val-block{display:flex;flex-direction:column;gap:2px;align-items:flex-end}
+.val-actual{font-size:14px;font-weight:700;color:var(--pd)}
+.val-target{font-size:11px;color:var(--tx3)}
+/* Growth badge */
+.gbadge{display:inline-flex;align-items:center;gap:3px;padding:3px 9px;
+  border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap}
 .gbadge.pos{background:var(--gbg);color:var(--green)}
 .gbadge.neg{background:var(--rbg);color:var(--red)}
 .gbadge.zero{background:#F0EFF8;color:var(--tx3)}
-.val-actual{font-size:13px;font-weight:700;color:var(--pd)}
-.val-target{font-size:12px;color:var(--tx2)}
-.edit-btn{background:var(--pl);border:none;color:var(--p);padding:4px 10px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s}
-.edit-btn:hover{background:var(--pm);color:#fff}
-.del-btn{background:#FCEBEB;border:none;color:var(--red);padding:4px 8px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s;margin-left:4px}
+/* Action buttons */
+.edit-btn{background:var(--pl);border:none;color:var(--p);width:30px;height:30px;border-radius:8px;
+  font-size:13px;cursor:pointer;font-family:inherit;transition:all .15s;display:inline-flex;
+  align-items:center;justify-content:center}
+.edit-btn:hover{background:var(--p);color:#fff}
+.del-btn{background:#FCEBEB;border:none;color:var(--red);width:30px;height:30px;border-radius:8px;
+  font-size:13px;cursor:pointer;font-family:inherit;transition:all .15s;display:inline-flex;
+  align-items:center;justify-content:center;margin-left:4px}
 .del-btn:hover{background:var(--red);color:#fff}
 
 /* MODAL */
@@ -386,7 +405,8 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
   .ht-title{font-size:16px}
   .hist-table th,.hist-table td{padding:7px 9px;font-size:11px}
   /* Hide less critical history columns on mobile */
-  .hist-table th:nth-child(5),.hist-table td:nth-child(5){display:none}
+  /* Hide growth col on mobile */
+.hist-table th:nth-child(4),.hist-table td:nth-child(4){display:none}
 
   /* Forecast */
   #fc-summary-cards{grid-template-columns:1fr 1fr !important;gap:8px !important}
@@ -588,12 +608,11 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
     <div class="hist-wrap">
       <table class="hist-table">
         <thead><tr>
-          <th style="width:155px">PIC</th>
+          <th style="width:160px">PIC</th>
           <th>Objective / Metrik</th>
-          <th class="r" style="width:110px">Target</th>
-          <th class="r" style="width:110px">Aktual</th>
-          <th class="c" style="width:90px">Growth</th>
-          <th class="c" style="width:80px">Status</th>
+          <th class="r" style="width:130px">Aktual / Target</th>
+          <th class="c" style="width:110px">Growth</th>
+          <th class="c" style="width:90px">Status</th>
           <th class="c" style="width:80px">Aksi</th>
         </tr></thead>
         <tbody id="hist-tbody"></tbody>
@@ -1754,19 +1773,30 @@ function renderHistory(){
       else if(g<-0.5) gb='<span class="gbadge neg">▼ -'+Math.abs(g).toFixed(1)+'%</span>';
       else gb='<span class="gbadge zero">≈ 0%</span>';
       const tsFormatted = formatTs(r.ts);
-      html+=`<tr style="background:${bg}">
-        <td style="width:155px">
-          <div class="pic-chip" style="background:${ps.bg};color:${ps.color}">${ps.animal} ${r.pic}</div>
-          <div class="role-badge" style="${rs};margin-top:3px;display:inline-block">${r.role}</div>
-          ${tsFormatted?`<div style="font-size:10px;color:var(--tx3);margin-top:3px">${tsFormatted}</div>`:''}
+      html+=`<tr class="hist-row" style="background:${bg}">
+        <td>
+          <div class="pic-cell">
+            <div class="pic-chip" style="background:${ps.bg};color:${ps.color}">${ps.animal} ${r.pic}</div>
+            <div class="role-badge" style="${rs}">${r.role}</div>
+            ${tsFormatted?`<div class="ts-label">${tsFormatted}</div>`:''}
+          </div>
         </td>
-        <td><div class="obj-text">${r.obj||r.key||'–'}</div></td>
-        <td class="r" style="font-size:12px;font-weight:600;color:var(--p)">${r.target||'–'}</td>
-        <td class="r" style="font-size:12px;color:var(--tx)">${r.actual||'–'}</td>
+        <td>
+          <div class="obj-cell">
+            <div class="obj-name">${r.obj||r.key||'–'}</div>
+            ${r.notes?`<div class="obj-notes">${r.notes}</div>`:''}
+          </div>
+        </td>
+        <td class="r">
+          <div class="val-block">
+            <span class="val-actual">${r.actual||'–'}</span>
+            <span class="val-target">Target: ${r.target||'–'}</span>
+          </div>
+        </td>
         <td class="c">${gb}</td>
         <td class="c">${tlPill(status)}</td>
-        <td class="c" style="white-space:nowrap">
-          <button class="edit-btn" onclick="openEditModal(${r.id})" title="Edit">✏</button>
+        <td class="c">
+          <button class="edit-btn" onclick="openEditModal(${r.id})" title="Edit">✏️</button>
           <button class="del-btn" onclick="deleteRow(${r.id})" title="Hapus">✕</button>
         </td>
       </tr>`;
