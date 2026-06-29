@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
 :root{
   --p:#534AB7;--pl:#EEEDFE;--pm:#AFA9EC;--pd:#3C3489;
   --y:#EF9F27;--yl:#FAEEDA;--yd:#633806;
@@ -221,6 +222,23 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .modal-save{padding:9px 22px;border:none;border-radius:var(--rs);font-family:inherit;font-size:13px;font-weight:700;color:#fff;background:var(--p);cursor:pointer;transition:background .2s}
 .modal-save:hover{background:var(--pd)}
 
+/* MODAL — REVISI TARGET RETROAKTIF (lebih lebar untuk tabel) */
+.modal-box-wide{background:#fff;border-radius:16px;padding:28px;width:680px;max-width:92vw;box-shadow:var(--shl);max-height:88vh;overflow-y:auto}
+.rtr-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
+.rtr-table th{text-align:left;padding:8px 10px;color:var(--tx3);font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.04em;border-bottom:2px solid var(--border)}
+.rtr-table td{padding:9px 10px;border-bottom:1px solid #F0EFF8;vertical-align:top}
+.rtr-table tr:last-child td{border-bottom:none}
+.rtr-period-group{background:#FAFAFE;font-weight:700;color:var(--tx);font-size:12px}
+.rtr-arrow{color:var(--tx3);margin:0 5px}
+.rtr-old{color:var(--tx3);text-decoration:line-through}
+.rtr-new{color:var(--p);font-weight:700}
+.rtr-pic-tag{display:inline-block;font-size:10px;background:#F0EFF8;color:var(--p);padding:2px 7px;border-radius:6px;margin-right:3px;margin-top:2px}
+.rtr-bulk-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:#FAFAFE;border:1px solid var(--border);border-radius:var(--rs);margin-top:14px;margin-bottom:4px}
+.rtr-bulk-btn{font-size:11.5px;font-weight:600;color:var(--p);background:#F0EFF8;border:none;padding:6px 12px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.rtr-bulk-btn:hover{background:#E4E1F7}
+.rtr-checkbox{width:16px;height:16px;cursor:pointer;accent-color:var(--p)}
+.rtr-empty-state{text-align:center;padding:30px 20px;color:var(--tx3);font-size:13px}
+
 /* TOAST */
 .toast{position:fixed;bottom:26px;right:26px;background:var(--pd);color:#fff;padding:11px 20px;border-radius:12px;font-size:13px;font-weight:500;box-shadow:var(--shl);display:none;z-index:999}
 
@@ -237,6 +255,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .s-table td{padding:8px 12px;border-bottom:1px solid #F0EFF8;vertical-align:middle}
 .s-table tr:last-child td{border-bottom:none}
 .s-table tr:hover td{background:#F5F4FC}
+.s-table tr.dragging-row{opacity:.4}
+.s-table tr.drag-over td{border-top:2px solid var(--p)}
 .s-inp{width:100%;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;color:var(--tx);outline:none;transition:border-color .2s;background:#fff}
 .s-inp:focus{border-color:var(--p)}
 .s-sel{padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;color:var(--tx);background:#fff;outline:none;cursor:pointer;width:100%}
@@ -302,6 +322,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
   border-radius:20px;font-size:11px;font-weight:700;text-decoration:none;transition:background .2s}
 .guide-nav-btn:hover{background:var(--pd)}
 .guide-section{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  scroll-margin-top:78px;
   margin-bottom:16px;overflow:hidden;box-shadow:var(--sh)}
 .guide-section-hd{display:flex;align-items:center;gap:12px;padding:14px 18px;
   background:var(--pl);border-bottom:1px solid var(--border);
@@ -327,6 +348,8 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(-
 .guide-a{font-size:12px;color:var(--tx2);line-height:1.6}
 kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-radius:4px;
   font-size:11px;background:#F8F7FE;font-family:monospace}
+.guide-body code{display:inline-block;padding:1px 6px;border-radius:4px;
+  font-size:11.5px;background:#F0EFF8;color:var(--pd);font-family:monospace}
 
 /* ============================================================
    MOBILE RESPONSIVE
@@ -492,7 +515,7 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
       </div>
     </div>
     <div class="topbar-right">
-      <button class="tbtn" onclick="exportCSV()">⬇ Export CSV</button>
+      <button class="tbtn" id="topbar-export-btn" onclick="exportCSV()">⬇ Export CSV</button>
       <span id="topbar-username" style="font-size:12px;color:var(--pm);margin-right:4px"></span>
       <button class="logout-btn" onclick="doLogout()">Keluar</button>
     </div>
@@ -509,54 +532,58 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
   <!-- PANEL: Dashboard -->
   <div class="tab-panel active" id="panel-dashboard">
   <div class="mc">
-    <!-- Info bar: periode + last update -->
+    <!-- Info bar: periode aktif (bisa dipilih) + last update -->
     <div class="dash-infobar">
       <div class="dash-period-block">
-        <span class="dash-period-label">Periode Aktif</span>
-        <span class="dash-period-val" id="period-range">–</span>
+        <span class="dash-period-label">Periode Aktif <span style="font-weight:400;text-transform:none;letter-spacing:0">— mempengaruhi kartu ringkasan di bawah</span></span>
+        <select id="dash-active-period" onchange="setDashActivePeriod(this.value)"
+          style="margin-top:4px;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;
+          font-family:inherit;font-size:14px;font-weight:700;color:var(--p);background:#fff;outline:none;cursor:pointer;max-width:280px">
+        </select>
       </div>
       <div class="dash-update-block">
         <span class="dash-period-label">Diperbarui</span>
         <strong id="update-date" class="dash-update-val">–</strong>
       </div>
     </div>
-    <!-- Filter Waktu Overview -->
-    <div class="overview-filter-bar">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1">
-        <span style="font-size:11px;font-weight:700;color:var(--tx2)">Filter Periode:</span>
-        <div class="ptoggle" style="background:#F0EFF8">
-          <button class="pbtn active" id="ovf-weekly" onclick="setOverviewPeriod('weekly')">📅 Weekly</button>
-          <button class="pbtn" id="ovf-monthly" onclick="setOverviewPeriod('monthly')">📆 Monthly</button>
-        </div>
-        <select id="ovf-preset" onchange="setOverviewPreset(this.value)"
-          style="padding:5px 10px;border:1.5px solid var(--border);border-radius:8px;
-          font-size:12px;font-family:inherit;color:var(--tx);background:#fff;outline:none;cursor:pointer">
-          <option value="last4">4 Periode Terakhir</option>
-          <option value="last8" selected>8 Periode Terakhir</option>
-          <option value="last12">12 Periode Terakhir</option>
-          <option value="custom">Rentang Kustom...</option>
-        </select>
-        <div id="ovf-custom" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
-          <span style="font-size:11px;color:var(--tx2)">Dari</span>
-          <select id="ovf-from" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;color:var(--tx);background:#fff;outline:none;cursor:pointer;min-width:140px" onchange="applyCustomOverviewFilter()"></select>
-          <span style="font-size:11px;color:var(--tx2)">Sampai</span>
-          <select id="ovf-to" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;color:var(--tx);background:#fff;outline:none;cursor:pointer;min-width:140px" onchange="applyCustomOverviewFilter()"></select>
-        </div>
-      </div>
-      <div id="ovf-range-label" style="font-size:11px;color:var(--tx3);white-space:nowrap"></div>
-    </div>
 
-    <!-- Summary cards — dynamic dari dashboardConfig -->
+    <!-- Summary cards — dipengaruhi oleh Periode Aktif di atas -->
     <div class="sum-grid" id="sum-grid-dynamic"></div>
 
-    <!-- Trend chart — dynamic tabs dari dashboardConfig -->
-    <div class="trend-card">
-      <div class="trend-hd">
-        <strong style="font-size:14px">Grafik Tren KPI</strong>
-        <div class="trend-tabs" id="trend-tabs-dynamic"></div>
+    <!-- Panel gabungan: Filter Rentang + Grafik Tren — satu kesatuan visual -->
+    <div class="trend-card" style="padding:0;overflow:hidden">
+      <div class="overview-filter-bar" style="margin:0;border-radius:0;border:none;border-bottom:1px solid var(--border);box-shadow:none">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1">
+          <span style="font-size:11px;font-weight:700;color:var(--tx2)">📈 Rentang Grafik Tren:</span>
+          <div class="ptoggle" style="background:#F0EFF8">
+            <button class="pbtn active" id="ovf-weekly" onclick="setOverviewPeriod('weekly')">📅 Weekly</button>
+            <button class="pbtn" id="ovf-monthly" onclick="setOverviewPeriod('monthly')">📆 Monthly</button>
+          </div>
+          <select id="ovf-preset" onchange="setOverviewPreset(this.value)"
+            style="padding:5px 10px;border:1.5px solid var(--border);border-radius:8px;
+            font-size:12px;font-family:inherit;color:var(--tx);background:#fff;outline:none;cursor:pointer">
+            <option value="last4">4 Periode Terakhir</option>
+            <option value="last8" selected>8 Periode Terakhir</option>
+            <option value="last12">12 Periode Terakhir</option>
+            <option value="custom">Rentang Kustom...</option>
+          </select>
+          <div id="ovf-custom" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-size:11px;color:var(--tx2)">Dari</span>
+            <select id="ovf-from" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;color:var(--tx);background:#fff;outline:none;cursor:pointer;min-width:140px" onchange="applyCustomOverviewFilter()"></select>
+            <span style="font-size:11px;color:var(--tx2)">Sampai</span>
+            <select id="ovf-to" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;color:var(--tx);background:#fff;outline:none;cursor:pointer;min-width:140px" onchange="applyCustomOverviewFilter()"></select>
+          </div>
+        </div>
+        <div id="ovf-range-label" style="font-size:11px;color:var(--tx3);white-space:nowrap"></div>
       </div>
-      <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
-      <div class="legend-row" id="trend-legend"></div>
+      <div style="padding:18px">
+        <div class="trend-hd">
+          <strong style="font-size:14px">Grafik Tren KPI</strong>
+          <div class="trend-tabs" id="trend-tabs-dynamic"></div>
+        </div>
+        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+        <div class="legend-row" id="trend-legend"></div>
+      </div>
     </div>
     <!-- KPI per anggota tim: header + period toggle -->
     <div class="kpi-section-hd">
@@ -643,34 +670,11 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
         <div>
           <label style="font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Data yang Diforecast</label>
           <select id="fc-metric" style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:13px;color:var(--tx);background:#fff;outline:none;transition:border-color .2s;" onchange="updateFcMetricInfo()">
-            <optgroup label="🐕 Indra — SEO">
-              <option value="seo_main|weekly">Organic Traffic — Main Domain (Weekly)</option>
-              <option value="seo_main|monthly">Organic Traffic — Main Domain (Monthly)</option>
-              <option value="seo_sub|weekly">Organic Traffic — Sub Domain (Weekly)</option>
-              <option value="seo_sub|monthly">Organic Traffic — Sub Domain (Monthly)</option>
-              <option value="seo_pv|weekly">PageViews Organic (Weekly)</option>
-              <option value="seo_pv|monthly">PageViews Organic (Monthly)</option>
-            </optgroup>
-            <optgroup label="🐱 Moniq — Growth">
-              <option value="gr_rev1|weekly">Revenue YT Narasi (Weekly)</option>
-              <option value="gr_rev1|monthly">Revenue YT Narasi (Monthly)</option>
-              <option value="gr_rev2|monthly">Revenue YT Najwa Shihab (Monthly)</option>
-              <option value="gr_rev3|monthly">Revenue YT Newsroom (Monthly)</option>
-            </optgroup>
-            <optgroup label="🐰 Hokkie — Paid Ads">
-              <option value="ads_spend|weekly">Ad Spend (Weekly)</option>
-              <option value="ads_spend|monthly">Ad Spend (Monthly)</option>
-              <option value="ads_cpc|weekly">CPC (Weekly)</option>
-              <option value="ads_cpc|monthly">CPC (Monthly)</option>
-              <option value="ads_ctr|monthly">CTR Ads % (Monthly)</option>
-            </optgroup>
-            <optgroup label="🦊 Asmarani — Website">
-              <option value="wm_vmain|weekly">Total Views Main Domain (Weekly)</option>
-              <option value="wm_vmain|monthly">Total Views Main Domain (Monthly)</option>
-              <option value="wm_vsub|monthly">Total Views Sub Domain (Monthly)</option>
-              <option value="wm_rev|monthly">Revenue Website (Monthly)</option>
-            </optgroup>
+            <!-- Diisi otomatis oleh rebuildForecastMetricSelect() berdasarkan data historis nyata -->
           </select>
+          <div id="fc-empty-msg" style="display:none;margin-top:8px;font-size:11px;color:var(--tx3);line-height:1.5">
+            ⚠️ Belum ada metrik dengan minimal 2 periode data yang sudah di-submit. Submit data KPI di tab 📋 Dashboard terlebih dahulu, minimal untuk 2 periode berbeda.
+          </div>
         </div>
 
         <!-- Metode -->
@@ -687,12 +691,19 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
         <!-- Horizon -->
         <div>
           <label style="font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Forecast Sampai</label>
-          <select id="fc-horizon" style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:13px;color:var(--tx);background:#fff;outline:none;transition:border-color .2s;">
+          <select id="fc-horizon" style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:13px;color:var(--tx);background:#fff;outline:none;transition:border-color .2s;" onchange="onFcHorizonChange()">
             <option value="3">3 periode ke depan</option>
             <option value="6" selected>6 periode ke depan</option>
             <option value="9">9 periode ke depan</option>
             <option value="12">12 periode ke depan</option>
+            <option value="custom">Kustom...</option>
           </select>
+          <div id="fc-horizon-custom-wrap" style="display:none;margin-top:8px">
+            <input type="number" id="fc-horizon-custom" min="1" max="52" value="6"
+              style="width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:var(--rs);font-family:inherit;font-size:13px;color:var(--tx);background:#fff;outline:none"
+              placeholder="Jumlah periode ke depan (1–52)" oninput="clampFcHorizonCustom()"/>
+            <div style="font-size:10.5px;color:var(--tx3);margin-top:4px">Masukkan jumlah periode ke depan, antara 1 dan 52</div>
+          </div>
         </div>
 
         <!-- Run -->
@@ -829,10 +840,12 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
       <a href="#g-history" class="guide-nav-btn">④ Histori</a>
       <a href="#g-forecast" class="guide-nav-btn">⑤ Forecasting</a>
       <a href="#g-settings" class="guide-nav-btn">⑥ Pengaturan</a>
-      <a href="#g-members" class="guide-nav-btn">⑦ Anggota Tim</a>
-      <a href="#g-dashconfig" class="guide-nav-btn">⑧ Konfigurasi Dashboard</a>
-      <a href="#g-sheets" class="guide-nav-btn">⑨ Google Sheets</a>
-      <a href="#g-faq" class="guide-nav-btn">⑩ FAQ</a>
+      <a href="#g-rtr" class="guide-nav-btn">⑦ Revisi Target</a>
+      <a href="#g-members" class="guide-nav-btn">⑧ Anggota Tim</a>
+      <a href="#g-dashconfig" class="guide-nav-btn">⑨ Konfigurasi Dashboard</a>
+      <a href="#g-export" class="guide-nav-btn">⑩ Export CSV</a>
+      <a href="#g-supabase" class="guide-nav-btn">⑪ Sinkronisasi & Supabase</a>
+      <a href="#g-faq" class="guide-nav-btn">⑫ FAQ</a>
     </div>
 
     <!-- Section 1: Login -->
@@ -846,7 +859,7 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
         <div class="guide-step-list">
           <div class="guide-step">
             <span class="guide-step-num">1</span>
-            <div>Masukkan <strong>Username</strong> dan <strong>Password</strong> yang diberikan admin.</div>
+            <div>Masukkan <strong>Username</strong> (tanpa <code>@narasi.tv</code>, cukup nama depan) dan <strong>Password</strong> yang diberikan admin.</div>
           </div>
           <div class="guide-step">
             <span class="guide-step-num">2</span>
@@ -854,11 +867,14 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
           </div>
           <div class="guide-step">
             <span class="guide-step-num">3</span>
-            <div>Dashboard akan terbuka. Data dimuat dari server di background — tunggu sebentar hingga data terbaru muncul.</div>
+            <div>Dashboard akan terbuka langsung dengan data lokal/cache. Data terbaru dari server dimuat di background dan akan otomatis menggantikan tampilan begitu selesai — tidak perlu menunggu atau refresh manual.</div>
           </div>
         </div>
         <div class="guide-note">
-          💡 <strong>Lupa password?</strong> Hubungi admin untuk reset di sheet <code>users</code> di Google Sheets.
+          💡 <strong>Lupa password?</strong> Hubungi admin untuk reset password di <strong>Supabase Dashboard → Authentication → Users</strong>. Login menggunakan Supabase Auth dengan format email <code>username@narasi.tv</code> di balik layar — Anda hanya perlu mengetik username-nya saja di form login.
+        </div>
+        <div class="guide-note">
+          🔒 <strong>Sesi otomatis tersimpan.</strong> Setelah login sekali, sesi Anda tetap aktif selama tab browser tidak ditutup/sesi tidak dihapus. Tidak perlu login ulang setiap kali membuka dashboard di tab yang sama.
         </div>
       </div>
     </div>
@@ -870,19 +886,23 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
         <span>Halaman Dashboard Utama</span>
       </div>
       <div class="guide-body">
-        <p>Dashboard utama terdiri dari tiga area:</p>
+        <p>Dashboard utama dirancang dengan dua pasangan <strong>filter → konten</strong> yang independen satu sama lain — penting untuk dipahami supaya tidak salah duga saat mengubah filter:</p>
 
-        <div class="guide-sub-title">📊 Summary Cards</div>
-        <p>Menampilkan ringkasan metrik utama. Card pertama selalu menunjukkan jumlah KPI yang <em>on track</em> vs total metrik. Card lainnya ditentukan lewat <strong>Konfigurasi Dashboard</strong> berdasarkan Metrics Group yang Anda buat.</p>
+        <div class="guide-sub-title">🗓 Periode Aktif → Summary Cards</div>
+        <p>Di bagian paling atas, ada dropdown <strong>"Periode Aktif"</strong> yang bisa dipilih bebas (minggu/bulan apa saja yang sudah lewat atau sedang berjalan). Dropdown ini <strong>mengontrol langsung angka di Summary Cards</strong> di bawahnya — pilih periode lain, dan kartu ringkasan akan menghitung ulang berdasarkan data periode tersebut.</p>
+        <div class="guide-note">💡 Periode yang sedang berjalan ditandai dengan label "(berjalan)" di dropdown.</div>
 
-        <div class="guide-sub-title">📈 Grafik Tren</div>
-        <p>Menampilkan tren historis metrik dari data yang telah disubmit. Pilih tab grafik (sesuai Metrics Group) dan gunakan filter periode di atas untuk mengubah rentang waktu tampilan. Klik <strong>📅 Weekly</strong> atau <strong>📆 Monthly</strong> untuk beralih tipe periode.</p>
-
-        <div class="guide-sub-title">🗓 Filter Periode Overview</div>
+        <div class="guide-sub-title">📈 Filter Rentang Grafik → Grafik Tren</div>
+        <p>Terpisah dari dropdown di atas, ada panel <strong>"Rentang Grafik Tren"</strong> yang menyatu langsung dengan grafiknya (satu kotak, dipisahkan garis tipis) — supaya jelas bahwa filter ini cuma mempengaruhi grafik di bawahnya, bukan Summary Cards. Opsinya:</p>
         <div class="guide-step-list">
-          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>4 / 8 / 12 Periode Terakhir</strong> — preset cepat</div></div>
-          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Rentang Kustom</strong> — pilih periode awal dan akhir secara bebas</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Weekly / Monthly</strong> — tipe periode yang ditampilkan di grafik.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>4 / 8 / 12 Periode Terakhir</strong> — preset cepat.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Rentang Kustom</strong> — pilih periode awal dan akhir secara bebas lewat dua dropdown "Dari" dan "Sampai".</div></div>
         </div>
+        <p>Grafik menampilkan satu tab per <strong>Metrics Group</strong> yang sudah dikonfigurasi (lihat bagian ⑨ Konfigurasi Dashboard).</p>
+
+        <div class="guide-sub-title">📋 KPI per Anggota Tim</div>
+        <p>Di bagian paling bawah halaman Dashboard, ada kartu input KPI untuk setiap anggota tim — ini bagian yang dipakai untuk mengisi data harian/mingguan (dijelaskan detail di bagian berikutnya).</p>
       </div>
     </div>
 
@@ -893,17 +913,17 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
         <span>Input KPI per Anggota Tim</span>
       </div>
       <div class="guide-body">
-        <p>Di bawah grafik terdapat kartu KPI untuk setiap anggota tim. Setiap anggota mengisi KPI-nya sendiri.</p>
+        <p>Di bagian bawah Dashboard terdapat kartu KPI untuk setiap anggota tim. Setiap anggota mengisi KPI-nya sendiri, dan periode toggle Weekly/Monthly di sini independen dari filter manapun di bagian atas halaman.</p>
 
         <div class="guide-sub-title">Cara Input KPI Mingguan</div>
         <div class="guide-step-list">
           <div class="guide-step"><span class="guide-step-num">1</span><div>Pastikan tab <strong>📅 Weekly</strong> aktif di kartu anggota yang ingin diisi.</div></div>
           <div class="guide-step"><span class="guide-step-num">2</span><div>Dropdown periode otomatis menunjuk ke <strong>minggu berjalan</strong> (Senin–Minggu). Untuk mengisi minggu lain, pilih dari dropdown.</div></div>
           <div class="guide-step"><span class="guide-step-num">3</span><div>Jika belum ada data, klik <strong>✏️ Isi KPI</strong>. Form input akan muncul.</div></div>
-          <div class="guide-step"><span class="guide-step-num">4</span><div>Isi kolom <strong>Aktual</strong> dengan nilai pencapaian nyata. Kolom <strong>Target</strong> sudah terisi default — ubah jika perlu.</div></div>
+          <div class="guide-step"><span class="guide-step-num">4</span><div>Isi kolom <strong>Aktual</strong> dengan nilai pencapaian nyata. Kolom <strong>Target</strong> sudah terisi default dari Pengaturan KPI — ubah jika perlu kasus khusus.</div></div>
           <div class="guide-step"><span class="guide-step-num">5</span><div>Kolom <strong>Status</strong> akan otomatis berubah: <span style="color:var(--green)">● On Track</span>, <span style="color:var(--amber)">● Warning</span>, atau <span style="color:var(--red)">● Off Track</span>.</div></div>
           <div class="guide-step"><span class="guide-step-num">6</span><div>Kolom <strong>vs Lalu</strong> menampilkan perbandingan dengan periode sebelumnya secara otomatis (butuh data periode sebelumnya).</div></div>
-          <div class="guide-step"><span class="guide-step-num">7</span><div>Klik <strong>📨 Simpan Data</strong> untuk menyimpan ke histori dan Google Sheets.</div></div>
+          <div class="guide-step"><span class="guide-step-num">7</span><div>Klik <strong>📨 Simpan Data</strong> untuk menyimpan ke histori dan Supabase.</div></div>
         </div>
 
         <div class="guide-sub-title">Cara Input KPI Bulanan</div>
@@ -913,11 +933,15 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
         <p>Pilih periode yang sudah punya data dari dropdown → data tampil dalam mode <em>read-only</em> → klik <strong>✏️ Edit Data</strong> di pojok kanan bawah tabel → ubah nilai → klik <strong>✓ Perbarui Data</strong>.</p>
 
         <div class="guide-note">
-          💡 Jika Anda submit ulang periode yang sudah ada data, akan muncul konfirmasi <em>"Perbarui Data?"</em>. Data lama akan ditimpa.
+          💡 Jika Anda submit ulang periode yang sudah ada data, akan muncul konfirmasi <em>"Perbarui Data?"</em>. Data lama akan ditimpa (bukan duplikat) — sistem menghapus entri lama untuk periode tersebut lalu menyimpan yang baru.
         </div>
 
         <div class="guide-sub-title">Kolom Summary di Bawah Tabel</div>
         <p>Setelah tabel KPI, muncul ringkasan otomatis yang menunjukkan tiap metrik: apakah melampaui target, di bawah target, dan naik/turun berapa persen dibanding periode sebelumnya.</p>
+
+        <div class="guide-note">
+          ⚡ <strong>Sinkronisasi multi-perangkat:</strong> Setiap submit langsung tersimpan ke Supabase. Browser lain yang sedang terbuka akan menerima data terbaru secara otomatis dalam ±30 detik (polling background), tanpa perlu refresh manual dan tanpa risiko saling menimpa data antar anggota.
+        </div>
       </div>
     </div>
 
@@ -928,15 +952,20 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
         <span>Histori KPI</span>
       </div>
       <div class="guide-body">
-        <p>Tab <strong>🕓 Histori KPI</strong> menampilkan rekap semua data yang sudah disubmit.</p>
+        <p>Tab <strong>🕓 Histori KPI</strong> menampilkan rekap semua data yang sudah disubmit, lintas semua anggota dan periode.</p>
         <div class="guide-step-list">
           <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Filter</strong> — saring berdasarkan periode atau anggota tim menggunakan dropdown filter di atas tabel.</div></div>
           <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Edit</strong> — klik ✏️ pada baris untuk membuka modal edit dan mengubah nilai aktual, target, atau catatan.</div></div>
-          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Hapus</strong> — klik ✕ untuk menghapus entri dari histori lokal. Data di Google Sheets juga ikut terhapus.</div></div>
-          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Export CSV</strong> — klik tombol <strong>⬇ Export CSV</strong> di topbar untuk mengunduh seluruh data dashboard.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Hapus</strong> — klik ✕ untuk menghapus entri dari histori. Data di Supabase juga ikut terhapus secara permanen.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Export CSV</strong> — klik tombol <strong>⬇ Export CSV</strong> di toolbar tab Histori (kanan atas tabel) untuk mengunduh data histori yang sedang ditampilkan, sesuai filter aktif.</div></div>
         </div>
+
+        <div class="guide-sub-title">🔄 Ikon "Target Mengikuti Terkini"</div>
+        <p>Jika Anda melihat ikon 🔄 di sebelah nilai Target pada sebuah baris, itu berarti target untuk periode tersebut <strong>tidak pernah diisi secara eksplisit</strong> saat data disubmit dulu — sehingga baris itu otomatis mengikuti target global yang berlaku saat ini di Pengaturan KPI. Begitu target global direvisi lagi, nilai pada baris ini akan ikut berubah secara otomatis tanpa perlu tindakan tambahan.</p>
+        <p>Baris <strong>tanpa</strong> ikon 🔄 berarti target-nya sudah dikunci (freeze) — baik karena diisi eksplisit saat submit, atau karena sudah pernah diterapkan lewat fitur Revisi Target Retroaktif (lihat bagian ⑦).</p>
+
         <div class="guide-note">
-          ⚠️ Data histori dimuat ulang dari Google Sheets setiap kali tab Histori dibuka. Jika data belum muncul, tunggu sebentar.
+          ⚠️ Data histori dimuat ulang dari Supabase setiap kali tab Histori dibuka. Jika data terasa belum lengkap, tunggu sebentar — proses sinkronisasi background berjalan otomatis.
         </div>
       </div>
     </div>
@@ -948,7 +977,11 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
         <span>Proyeksi & Forecasting</span>
       </div>
       <div class="guide-body">
-        <p>Tab <strong>🔮 Proyeksi & Forecasting</strong> memungkinkan prediksi nilai KPI ke depan berdasarkan data historis.</p>
+        <p>Tab <strong>🔮 Proyeksi & Forecasting</strong> memungkinkan prediksi nilai KPI ke depan berdasarkan data historis nyata yang sudah disubmit dari Dashboard.</p>
+
+        <div class="guide-note">
+          ℹ️ <strong>Syarat minimal data:</strong> sebuah metrik hanya akan muncul di dropdown forecast jika sudah punya <strong>minimal 2 periode data</strong> yang disubmit (Weekly atau Monthly, dihitung terpisah). Dropdown akan menampilkan keterangan jumlah periode yang tersedia untuk setiap metrik, contoh: <em>"Organic Traffic (Weekly) — 4 periode data"</em>. Metrik yang datanya belum cukup tidak akan muncul di pilihan.
+        </div>
 
         <div class="guide-sub-title">Cara Menggunakan</div>
         <div class="guide-step-list">
@@ -962,12 +995,12 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
           <div class="guide-method-card"><strong>🚀 Growth Rate (CAGR)</strong> — proyeksi berbasis rata-rata pertumbuhan historis. Cocok untuk data yang tumbuh konsisten.</div>
         </div>
         <div class="guide-step-list">
-          <div class="guide-step"><span class="guide-step-num">3</span><div>Pilih <strong>horizon</strong> — berapa periode ke depan yang ingin diproyeksikan (3, 6, 9, atau 12).</div></div>
+          <div class="guide-step"><span class="guide-step-num">3</span><div>Pilih <strong>horizon</strong> — berapa periode ke depan yang ingin diproyeksikan: pilihan cepat 3, 6, 9, atau 12 periode, atau pilih <strong>Kustom...</strong> untuk memasukkan angka bebas antara <strong>1 sampai 52 periode</strong> ke depan lewat kolom input yang muncul.</div></div>
           <div class="guide-step"><span class="guide-step-num">4</span><div>Klik <strong>🔮 Jalankan Forecast</strong>.</div></div>
-          <div class="guide-step"><span class="guide-step-num">5</span><div>Lihat grafik, tabel detail dengan <em>confidence level</em>, dan insight otomatis.</div></div>
-          <div class="guide-step"><span class="guide-step-num">6</span><div>Klik <strong>⬇ Export Hasil</strong> untuk mengunduh hasil forecast sebagai CSV.</div></div>
+          <div class="guide-step"><span class="guide-step-num">5</span><div>Lihat grafik, tabel detail dengan <em>confidence level</em> per periode, dan insight otomatis. Label periode proyeksi berupa tanggal kalender asli (misal "6-12 Jul 2026"), bukan label generik — jadi langsung bisa dibaca konteksnya.</div></div>
+          <div class="guide-step"><span class="guide-step-num">6</span><div>Klik <strong>⬇ Export Hasil</strong> untuk mengunduh hasil forecast sebagai CSV — file akan menyesuaikan otomatis dengan horizon yang dipilih, termasuk horizon kustom yang panjang.</div></div>
         </div>
-        <div class="guide-note">💡 <strong>Confidence level</strong> menurun seiring bertambahnya horizon. Proyeksi 3–6 periode ke depan lebih andal dari 12 periode.</div>
+        <div class="guide-note">💡 <strong>Confidence level</strong> menurun seiring bertambahnya horizon. Proyeksi periode-periode awal jauh lebih andal daripada proyeksi 30-50 periode ke depan — gunakan horizon panjang sebagai gambaran kasar tren jangka panjang, bukan angka pasti.</div>
       </div>
     </div>
 
@@ -983,20 +1016,54 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
           <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Pilih anggota</strong> — klik tab nama anggota di bagian atas.</div></div>
           <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Nama Metrik</strong> — ubah nama metrik sesuai kebutuhan.</div></div>
           <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Tipe Data</strong> — pilih <em>💰 Rupiah</em>, <em>📊 Persen (%)</em>, atau <em>🔢 Angka</em>. Tipe ini menentukan format tampilan dan placeholder input.</div></div>
-          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Target Weekly / Monthly</strong> — isi nilai target untuk tiap periode.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Target Weekly / Monthly</strong> — isi nilai target untuk tiap periode. Mengubah nilai ini akan otomatis berlaku untuk semua periode masa depan yang belum disubmit.</div></div>
           <div class="guide-step"><span class="guide-step-num">•</span><div><strong>↓ Lebih Kecil = Baik</strong> — centang untuk metrik seperti CPC atau Ad Spend. Status <em>on track</em> akan dihitung terbalik.</div></div>
           <div class="guide-step"><span class="guide-step-num">•</span><div><strong>Centang aktif (✓)</strong> — hapus centang untuk menonaktifkan metrik tanpa menghapusnya.</div></div>
           <div class="guide-step"><span class="guide-step-num">•</span><div><strong>+ Tambah Metrik</strong> — tambah baris metrik baru untuk anggota tersebut.</div></div>
           <div class="guide-step"><span class="guide-step-num">•</span><div><strong>✕</strong> — hapus metrik (tidak bisa di-undo).</div></div>
         </div>
         <div class="guide-note">⚠️ Klik <strong>✓ Simpan Pengaturan</strong> di pojok kanan atas setelah selesai mengubah. Perubahan belum tersimpan sebelum diklik.</div>
+        <div class="guide-note">
+          🔄 <strong>Soal periode yang sudah lewat:</strong> mengubah target di sini <strong>tidak otomatis</strong> mengubah histori yang sudah disubmit dengan target eksplisit (lihat penjelasan ikon 🔄 di bagian ④ Histori). Jika Anda ingin merevisi target untuk periode yang sudah lewat, gunakan fitur <strong>Revisi Target Retroaktif</strong> — lihat bagian ⑦.
+        </div>
       </div>
     </div>
 
-    <!-- Section 7: Anggota Tim -->
-    <div class="guide-section" id="g-members">
+    <!-- Section 7: Revisi Target Retroaktif -->
+    <div class="guide-section" id="g-rtr">
       <div class="guide-section-hd">
         <span class="guide-num">⑦</span>
+        <span>Revisi Target Retroaktif</span>
+      </div>
+      <div class="guide-body">
+        <p>Fitur ini menjawab skenario: <em>"Target sudah saya isi sejak awal, tapi sekarang saya sadar nilainya kurang tepat — saya ingin merevisinya, termasuk untuk periode-periode lama yang sudah disubmit."</em></p>
+
+        <div class="guide-sub-title">Kapan Dialog Ini Muncul</div>
+        <p>Setiap kali Anda mengubah nilai target sebuah metrik di <strong>Pengaturan KPI</strong> dan klik <strong>✓ Simpan Pengaturan</strong>, sistem otomatis memeriksa: apakah ada histori lama untuk metrik tersebut yang target-nya sudah eksplisit terisi (bukan kosong) dan nilainya benar-benar berbeda dari yang baru? Jika tidak ada perubahan relevan, proses simpan berjalan seperti biasa tanpa dialog tambahan apa pun.</p>
+        <p>Jika ada, sebuah dialog <strong>"Terapkan Revisi Target ke Histori"</strong> akan muncul setelah pengaturan tersimpan.</p>
+
+        <div class="guide-sub-title">Cara Menggunakan Dialog</div>
+        <div class="guide-step-list">
+          <div class="guide-step"><span class="guide-step-num">1</span><div>Dialog menampilkan daftar <strong>periode yang terdampak</strong>, dikelompokkan per periode, lengkap dengan metrik dan PIC yang terpengaruh serta perbandingan target lama → target baru.</div></div>
+          <div class="guide-step"><span class="guide-step-num">2</span><div>Centang baris yang ingin diikutkan revisi — bisa per metrik satu-satu, atau centang checkbox di header periode untuk menerapkan ke <strong>semua metrik dalam periode itu sekaligus</strong>.</div></div>
+          <div class="guide-step"><span class="guide-step-num">3</span><div>Gunakan tombol <strong>✓ Pilih Semua</strong> / <strong>✕ Kosongkan Semua</strong> untuk seleksi cepat lintas periode dan metrik.</div></div>
+          <div class="guide-step"><span class="guide-step-num">4</span><div>Klik <strong>Terapkan ke Periode Terpilih</strong> — hanya baris yang dicentang yang nilainya berubah; sisanya tetap memakai target lama (freeze).</div></div>
+          <div class="guide-step"><span class="guide-step-num">5</span><div>Atau klik <strong>Lewati</strong> jika ternyata tidak ada yang perlu direvisi — semua histori tetap dengan target lama.</div></div>
+        </div>
+
+        <div class="guide-note">
+          💡 Tidak ada efek permanen sebelum Anda klik <strong>Terapkan</strong> — aman untuk membuka dialog ini, melihat-lihat daftarnya, lalu menutup tanpa mengubah apa pun.
+        </div>
+        <div class="guide-note">
+          ℹ️ Fitur ini khusus untuk target yang <strong>sudah pernah diisi</strong> sebelumnya. Jika target dulunya kosong (belum pernah diset), histori tersebut <strong>sudah otomatis</strong> mengikuti target terkini tanpa perlu dialog ini — lihat penjelasan ikon 🔄 di bagian ④ Histori.
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 8: Anggota Tim -->
+    <div class="guide-section" id="g-members">
+      <div class="guide-section-hd">
+        <span class="guide-num">⑧</span>
         <span>Manajemen Anggota Tim</span>
       </div>
       <div class="guide-body">
@@ -1007,113 +1074,161 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
           <div class="guide-step"><span class="guide-step-num">1</span><div>Isi <strong>Nama</strong> dan <strong>Role / Jabatan</strong>.</div></div>
           <div class="guide-step"><span class="guide-step-num">2</span><div>Pilih <strong>Avatar</strong> dan <strong>Warna Badge</strong>.</div></div>
           <div class="guide-step"><span class="guide-step-num">3</span><div>Klik <strong>➕ Tambahkan ke Tim</strong>.</div></div>
-          <div class="guide-step"><span class="guide-step-num">4</span><div>Anggota baru langsung muncul di Dashboard. Data tersimpan otomatis ke Google Sheets.</div></div>
+          <div class="guide-step"><span class="guide-step-num">4</span><div>Anggota baru langsung muncul di Dashboard. Data anggota tersimpan otomatis ke Supabase.</div></div>
         </div>
         <div class="guide-note">
-          ⚠️ <strong>Penting:</strong> Setelah menambah anggota baru, admin perlu menambahkan kredensial login anggota tersebut secara manual di sheet <code>users</code> di Google Sheets (kolom: username, password, name, TRUE).
+          ⚠️ <strong>Penting:</strong> Menambahkan anggota di sini <strong>hanya membuat profilnya tampil di Dashboard</strong> — belum membuat akun login. Admin perlu membuat akun login secara terpisah di <strong>Supabase Dashboard → Authentication → Users</strong>, dengan format email <code>username@narasi.tv</code> (sesuaikan dengan username yang akan diketik anggota saat login).
         </div>
 
         <div class="guide-sub-title">Hapus Anggota</div>
-        <p>Klik <strong>✕ Hapus</strong> di samping nama anggota → konfirmasi → anggota dihapus dari dashboard. <em>Data histori KPI-nya tetap tersimpan di Google Sheets</em>.</p>
+        <p>Klik <strong>✕ Hapus</strong> di samping nama anggota → konfirmasi → anggota dihapus dari dashboard. <em>Data histori KPI-nya tetap tersimpan di Supabase</em> dan tidak ikut terhapus, walau anggotanya sudah tidak muncul lagi di Dashboard.</p>
       </div>
     </div>
 
-    <!-- Section 8: Konfigurasi Dashboard -->
+    <!-- Section 9: Konfigurasi Dashboard -->
     <div class="guide-section" id="g-dashconfig">
       <div class="guide-section-hd">
-        <span class="guide-num">⑧</span>
+        <span class="guide-num">⑨</span>
         <span>Konfigurasi Dashboard</span>
       </div>
       <div class="guide-body">
-        <p>Tab <strong>⚙️ Pengaturan KPI → 📊 Konfigurasi Dashboard</strong> untuk mengatur apa yang tampil di summary cards dan grafik tren.</p>
+        <p>Tab <strong>⚙️ Pengaturan KPI → 📊 Konfigurasi Dashboard</strong> untuk mengatur apa yang tampil di Summary Cards dan grafik tren di halaman Dashboard.</p>
 
         <div class="guide-sub-title">Metrics Group</div>
-        <p>Setiap <em>Metrics Group</em> menjadi satu <strong>summary card</strong> dan satu <strong>tab grafik</strong> di halaman utama.</p>
+        <p>Setiap <em>Metrics Group</em> menjadi satu <strong>summary card</strong> dan satu <strong>tab grafik</strong> di halaman Dashboard.</p>
         <div class="guide-step-list">
           <div class="guide-step"><span class="guide-step-num">1</span><div>Klik <strong>+ Buat Metrics Group Baru</strong>.</div></div>
           <div class="guide-step"><span class="guide-step-num">2</span><div>Ubah nama group (contoh: "Revenue", "Traffic", "Ads").</div></div>
           <div class="guide-step"><span class="guide-step-num">3</span><div>Pilih metrik dari dropdown <em>"+ Tambah metrik ke group ini..."</em>. Bisa pilih metrik dari anggota berbeda.</div></div>
           <div class="guide-step"><span class="guide-step-num">4</span><div>Klik ✕ di chip metrik untuk menghapus dari group.</div></div>
-          <div class="guide-step"><span class="guide-step-num">5</span><div>Klik <strong>💾 Simpan Konfigurasi</strong> agar tersimpan ke Google Sheets.</div></div>
+          <div class="guide-step"><span class="guide-step-num">5</span><div>Klik <strong>💾 Simpan Konfigurasi</strong> agar tersimpan ke Supabase.</div></div>
         </div>
-        <div class="guide-note">💡 Summary card menampilkan total/rata-rata semua metrik dalam group untuk periode terakhir. Grafik menampilkan tren tiap metrik dalam group secara multi-line.</div>
-
-        <div class="guide-sub-title">Filter Waktu</div>
-        <p>Filter periode di atas summary cards berlaku untuk seluruh overview — gunakan toggle Weekly/Monthly dan preset 4/8/12 periode atau rentang kustom.</p>
+        <div class="guide-note">💡 Summary Card menampilkan total/rata-rata semua metrik dalam group untuk periode yang dipilih di dropdown <strong>"Periode Aktif"</strong> (lihat bagian ②). Grafik tren menampilkan tren tiap metrik dalam group secara multi-line, dikontrol oleh filter rentang grafik yang terpisah.</div>
       </div>
     </div>
 
-    <!-- Section 9: Google Sheets -->
-    <div class="guide-section" id="g-sheets">
+    <!-- Section 10: Export CSV -->
+    <div class="guide-section" id="g-export">
       <div class="guide-section-hd">
-        <span class="guide-num">⑨</span>
-        <span>Koneksi Google Sheets</span>
+        <span class="guide-num">⑩</span>
+        <span>Export CSV</span>
       </div>
       <div class="guide-body">
-        <p>Dashboard tersinkronisasi dengan Google Sheets melalui Google Apps Script. Berikut daftar sheet dan fungsinya:</p>
+        <p>Dashboard punya tiga titik export CSV, masing-masing kontekstual sesuai tab yang sedang dibuka — tombolnya hanya muncul di tab yang relevan:</p>
         <div style="overflow-x:auto;margin:12px 0">
           <table style="width:100%;border-collapse:collapse;font-size:12px">
             <thead>
               <tr style="background:var(--pl)">
-                <th style="padding:8px 12px;text-align:left;border-bottom:2px solid var(--border);font-weight:700;color:var(--p)">Sheet</th>
+                <th style="padding:8px 12px;text-align:left;border-bottom:2px solid var(--border);font-weight:700;color:var(--p)">Lokasi</th>
+                <th style="padding:8px 12px;text-align:left;border-bottom:2px solid var(--border);font-weight:700;color:var(--p)">Isi File</th>
+                <th style="padding:8px 12px;text-align:left;border-bottom:2px solid var(--border);font-weight:700;color:var(--p)">Kapan Berguna</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px">Topbar, tab <strong>📊 Dashboard</strong></td><td style="padding:8px 12px">Snapshot kartu KPI yang sedang tampil per anggota — termasuk input yang belum disubmit</td><td style="padding:8px 12px">Backup cepat sebelum submit, atau membagikan kondisi terkini ke pihak lain</td></tr>
+              <tr style="background:#FAFAFE;border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px">Toolbar, tab <strong>🕓 Histori</strong></td><td style="padding:8px 12px">Seluruh rekap histori yang sudah disubmit, sesuai filter periode/anggota yang aktif</td><td style="padding:8px 12px">Laporan resmi, analisis lanjutan, dokumentasi performa per periode</td></tr>
+              <tr style="border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px">Hasil, tab <strong>🔮 Forecasting</strong></td><td style="padding:8px 12px">Data historis + proyeksi yang baru dijalankan, lengkap dengan confidence level</td><td style="padding:8px 12px">Presentasi proyeksi ke manajemen, lampiran proposal budget</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="guide-note">💡 Tombol Export CSV di topbar hanya muncul saat tab Dashboard aktif — di tab lain, gunakan tombol export yang sudah tersedia di toolbar/hasil masing-masing tab.</div>
+      </div>
+    </div>
+
+    <!-- Section 11: Sinkronisasi & Supabase -->
+    <div class="guide-section" id="g-supabase">
+      <div class="guide-section-hd">
+        <span class="guide-num">⑪</span>
+        <span>Sinkronisasi & Arsitektur Supabase</span>
+      </div>
+      <div class="guide-body">
+        <p>Dashboard ini sepenuhnya berjalan sebagai file HTML statis (bisa dihosting di GitHub Pages, Netlify, atau platform sejenis) dan berkomunikasi langsung ke <strong>Supabase</strong> — sebuah backend-as-a-service berbasis PostgreSQL — lewat REST API dan Supabase Auth. Tidak ada Google Sheets atau Apps Script yang terlibat lagi.</p>
+
+        <div class="guide-sub-title">Tabel di Database</div>
+        <div style="overflow-x:auto;margin:12px 0">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="background:var(--pl)">
+                <th style="padding:8px 12px;text-align:left;border-bottom:2px solid var(--border);font-weight:700;color:var(--p)">Tabel</th>
                 <th style="padding:8px 12px;text-align:left;border-bottom:2px solid var(--border);font-weight:700;color:var(--p)">Isi</th>
                 <th style="padding:8px 12px;text-align:left;border-bottom:2px solid var(--border);font-weight:700;color:var(--p)">Diupdate saat</th>
               </tr>
             </thead>
             <tbody>
-              <tr style="border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>users</code></td><td style="padding:8px 12px">Kredensial login</td><td style="padding:8px 12px">Manual oleh admin</td></tr>
-              <tr style="background:#FAFAFE;border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>sessions</code></td><td style="padding:8px 12px">Token login aktif</td><td style="padding:8px 12px">Otomatis saat login/logout</td></tr>
-              <tr style="border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>kpi_entries</code></td><td style="padding:8px 12px">Data KPI yang disubmit</td><td style="padding:8px 12px">Saat klik Simpan Data</td></tr>
-              <tr style="background:#FAFAFE;border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>kpi_settings</code></td><td style="padding:8px 12px">Konfigurasi metrik & target</td><td style="padding:8px 12px">Saat klik Simpan Pengaturan</td></tr>
-              <tr style="border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>team_members</code></td><td style="padding:8px 12px">Daftar anggota tim</td><td style="padding:8px 12px">Saat tambah/hapus anggota</td></tr>
-              <tr style="background:#FAFAFE;border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>dashboard_config</code></td><td style="padding:8px 12px">Metrics groups & filter</td><td style="padding:8px 12px">Saat klik Simpan Konfigurasi</td></tr>
+              <tr style="border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>kpi_users</code></td><td style="padding:8px 12px">Nama tampilan untuk setiap username login</td><td style="padding:8px 12px">Manual oleh admin via SQL Editor</td></tr>
+              <tr style="background:#FAFAFE;border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>kpi_members</code></td><td style="padding:8px 12px">Profil anggota tim (nama, role, avatar, badge)</td><td style="padding:8px 12px">Saat tambah/hapus anggota</td></tr>
+              <tr style="border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>kpi_entries</code></td><td style="padding:8px 12px">Data KPI yang disubmit per periode</td><td style="padding:8px 12px">Saat klik Simpan Data, edit/hapus histori, atau Revisi Target Retroaktif</td></tr>
+              <tr style="background:#FAFAFE;border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>kpi_settings</code></td><td style="padding:8px 12px">Konfigurasi metrik & target per anggota</td><td style="padding:8px 12px">Saat klik Simpan Pengaturan</td></tr>
+              <tr style="border-bottom:1px solid #F0EFF8"><td style="padding:8px 12px"><code>kpi_app_config</code></td><td style="padding:8px 12px">Metrics Groups & konfigurasi dashboard</td><td style="padding:8px 12px">Saat klik Simpan Konfigurasi</td></tr>
             </tbody>
           </table>
         </div>
-        <div class="guide-note">
-          💡 Data dimuat dari Sheets di background setelah login. Jika ada perubahan oleh anggota lain, refresh halaman untuk mendapatkan data terbaru.
+
+        <div class="guide-sub-title">Login & Autentikasi</div>
+        <p>Login menggunakan <strong>Supabase Auth</strong> (email + password). Username yang diketik di form login otomatis ditambahkan suffix <code>@narasi.tv</code> sebelum dikirim ke server — jadi anggota tim hanya perlu mengetik username pendeknya saja.</p>
+
+        <div class="guide-sub-title">Sinkronisasi Real-Time (Polling)</div>
+        <p>Setelah login, dashboard menjalankan pengecekan data terbaru ke Supabase setiap <strong>30 detik</strong> di background. Ini memastikan:</p>
+        <div class="guide-step-list">
+          <div class="guide-step"><span class="guide-step-num">•</span><div>Data yang disubmit anggota lain muncul otomatis tanpa perlu refresh manual.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div>Submit dari dua browser/perangkat berbeda untuk PIC atau periode yang berbeda <strong>tidak saling menimpa</strong> — setiap submit hanya mempengaruhi data PIC dan periode miliknya sendiri.</div></div>
+          <div class="guide-step"><span class="guide-step-num">•</span><div>Jika dua orang submit untuk PIC dan periode yang <em>sama persis</em> dalam rentang waktu yang berdekatan, submit yang lebih baru akan menjadi nilai final (last-write-wins) — koordinasikan dengan tim jika ini berpotensi terjadi.</div></div>
         </div>
+
+        <div class="guide-note">💡 Data dimuat dari Supabase di background setelah login dan setiap kali tab Histori/Dashboard dibuka. Proses ini tidak memblokir tampilan — dashboard langsung tampil dengan data lokal, lalu otomatis ter-update begitu data terbaru selesai dimuat.</div>
       </div>
     </div>
 
-    <!-- Section 10: FAQ -->
+    <!-- Section 12: FAQ -->
     <div class="guide-section" id="g-faq">
       <div class="guide-section-hd">
-        <span class="guide-num">⑩</span>
+        <span class="guide-num">⑫</span>
         <span>FAQ — Pertanyaan Umum</span>
       </div>
       <div class="guide-body">
         <div class="guide-faq">
           <div class="guide-q">Data yang saya input hilang setelah refresh halaman.</div>
-          <div class="guide-a">Pastikan Anda sudah klik <strong>📨 Simpan Data</strong> sebelum menutup atau refresh halaman. Data yang belum disubmit hanya tersimpan sementara di browser.</div>
+          <div class="guide-a">Pastikan Anda sudah klik <strong>📨 Simpan Data</strong> sebelum menutup atau refresh halaman. Data yang belum disubmit hanya tersimpan sementara di memori browser dan akan hilang saat halaman dimuat ulang.</div>
         </div>
         <div class="guide-faq">
           <div class="guide-q">Kolom "vs Lalu" kosong / menampilkan "–".</div>
           <div class="guide-a">Kolom ini membutuhkan data dari periode sebelumnya. Pastikan periode sebelumnya sudah diisi dan disubmit terlebih dahulu.</div>
         </div>
         <div class="guide-faq">
-          <div class="guide-q">Summary card dan grafik tidak muncul.</div>
+          <div class="guide-q">Summary Card dan grafik tidak muncul / menampilkan "Belum ada Metrics Group".</div>
           <div class="guide-a">Buka <strong>⚙️ Pengaturan KPI → 📊 Konfigurasi Dashboard</strong>, buat Metrics Group, tambahkan metrik, lalu klik Simpan Konfigurasi.</div>
         </div>
         <div class="guide-faq">
-          <div class="guide-q">Muncul error "Tidak bisa terhubung ke server".</div>
-          <div class="guide-a">Periksa koneksi internet. Jika koneksi normal, kemungkinan Apps Script sedang bermasalah — coba refresh halaman beberapa menit kemudian. Hubungi admin jika berlanjut.</div>
+          <div class="guide-q">Muncul error "Tidak bisa terhubung ke server" atau "Invalid login credentials" saat login.</div>
+          <div class="guide-a">Periksa koneksi internet. Jika koneksi normal, kemungkinan kredensial Supabase di kode (Project URL / API Key) belum diisi dengan benar, atau username yang diketik tidak cocok dengan akun yang dibuat di Supabase Authentication. Hubungi admin/tim teknis jika berlanjut.</div>
         </div>
         <div class="guide-faq">
-          <div class="guide-q">Periode minggu berjalan tidak muncul di dropdown.</div>
-          <div class="guide-a">Dashboard otomatis memperbarui daftar periode saat dibuka. Coba refresh halaman untuk memastikan daftar periode up-to-date.</div>
+          <div class="guide-q">Forecast menampilkan "Belum cukup data historis" padahal sudah ada data.</div>
+          <div class="guide-a">Forecast butuh minimal 2 periode data yang sudah disubmit untuk metrik dan tipe periode (Weekly/Monthly) yang sama. Submit data untuk minimal satu periode tambahan, lalu coba lagi — dropdown metrik akan otomatis menampilkan opsi begitu syarat ini terpenuhi.</div>
+        </div>
+        <div class="guide-faq">
+          <div class="guide-q">Periode minggu/bulan berjalan tidak muncul di dropdown.</div>
+          <div class="guide-a">Dashboard otomatis memperbarui daftar periode berdasarkan tanggal hari ini setiap kali dibuka. Coba refresh halaman untuk memastikan daftar periode up-to-date, terutama jika tab dibuka sejak beberapa hari lalu dan belum ditutup.</div>
         </div>
         <div class="guide-faq">
           <div class="guide-q">Saya submit KPI dua kali untuk periode yang sama.</div>
-          <div class="guide-a">Dashboard akan menampilkan konfirmasi "Perbarui Data?" — data lama akan ditimpa dengan data baru. Tidak ada duplikasi di Google Sheets.</div>
+          <div class="guide-a">Dashboard akan menampilkan konfirmasi "Perbarui Data?" — data lama akan ditimpa dengan data baru tanpa duplikasi di Supabase, karena sistem menghapus entri lama untuk PIC+periode+metrik tersebut sebelum menyimpan yang baru.</div>
         </div>
         <div class="guide-faq">
-          <div class="guide-q">Anggota baru tidak bisa login.</div>
-          <div class="guide-a">Admin perlu menambahkan kredensial login secara manual di sheet <code>users</code>: isi username, password, nama, dan <code>TRUE</code> di kolom active.</div>
+          <div class="guide-q">Target di histori lama tiba-tiba berubah padahal saya tidak mengeditnya.</div>
+          <div class="guide-a">Ini perilaku normal jika baris tersebut bertanda ikon 🔄 — artinya target periode itu belum pernah diisi eksplisit saat submit dulu, sehingga otomatis mengikuti target global terkini. Jika target global di Pengaturan KPI direvisi, baris ini ikut menyesuaikan. Lihat bagian ④ Histori untuk detail.</div>
+        </div>
+        <div class="guide-faq">
+          <div class="guide-q">Anggota baru tidak bisa login walau sudah ditambahkan di Anggota Tim.</div>
+          <div class="guide-a">Menambahkan anggota di tab Anggota Tim hanya membuat profilnya tampil di Dashboard — belum membuat akun login. Admin perlu membuat akun secara terpisah di <strong>Supabase Dashboard → Authentication → Users</strong> dengan email <code>username@narasi.tv</code>, lalu (opsional) menambahkan nama tampilannya ke tabel <code>kpi_users</code>.</div>
         </div>
         <div class="guide-faq">
           <div class="guide-q">Bagaimana cara logout?</div>
           <div class="guide-a">Klik tombol <strong>Keluar</strong> di pojok kanan atas topbar. Sesi akan berakhir dan Anda kembali ke halaman login.</div>
+        </div>
+        <div class="guide-faq">
+          <div class="guide-q">Project Supabase tidak merespon / data tidak ter-load sama sekali.</div>
+          <div class="guide-a">Project Supabase tier gratis akan otomatis "pause" setelah 7 hari tanpa aktivitas. Buka Supabase Dashboard untuk mengaktifkannya kembali — proses ini biasanya hanya butuh beberapa menit. Aktivitas rutin tim (submit data mingguan) biasanya sudah cukup mencegah hal ini terjadi.</div>
         </div>
       </div>
     </div>
@@ -1144,6 +1259,7 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
     <div class="modal-field">
       <label class="modal-label">Target</label>
       <input class="modal-input" id="modal-target" type="text" placeholder="Masukkan nilai target"/>
+      <div id="modal-target-hint" style="display:none;font-size:11px;color:var(--p);margin-top:5px;line-height:1.5"></div>
     </div>
     <div class="modal-field">
       <label class="modal-label">Aktual Periode Sebelumnya <span style="font-weight:400;color:var(--tx3)">(angka murni, untuk Growth)</span></label>
@@ -1160,42 +1276,220 @@ kbd{display:inline-block;padding:1px 6px;border:1px solid var(--border);border-r
   </div>
 </div>
 
+<!-- Modal: Terapkan Revisi Target ke Histori -->
+<div class="modal-overlay" id="rtr-modal">
+  <div class="modal-box-wide">
+    <div class="modal-title">🔄 Terapkan Revisi Target ke Histori</div>
+    <div class="modal-sub">Target beberapa metrik berubah. Pilih periode mana yang ikut menggunakan target baru — periode yang tidak dipilih tetap memakai target lama (freeze).</div>
+    <div class="rtr-bulk-row">
+      <span style="font-size:11.5px;color:var(--tx2);font-weight:600">Pilih cepat:</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="rtr-bulk-btn" onclick="rtrSelectAll(true)">✓ Pilih Semua</button>
+        <button class="rtr-bulk-btn" onclick="rtrSelectAll(false)">✕ Kosongkan Semua</button>
+      </div>
+    </div>
+    <div id="rtr-list-container"></div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeRtrModal()">Lewati (Tidak Ada yang Diubah)</button>
+      <button class="modal-save" onclick="applyRtrSelection()">Terapkan ke Periode Terpilih</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 /* ============================================================
-   APPS SCRIPT CONFIG
+   SUPABASE CONFIG
+   Ganti SUPABASE_URL dan SUPABASE_ANON_KEY dengan nilai dari
+   project Supabase kamu (Settings → API)
    ============================================================ */
-const AS_URL = 'https://script.google.com/macros/s/AKfycbzk_ctKsQedv_4y_TILYMFuR7vYV8mEWItxeMMBd7xFpgPc3omk32D5jEbNw8fCGE8_/exec';
+const SUPABASE_URL  = 'https://lcnwxrwbrftzerwwxcmx.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_vFL9TappZtItZqsqelLddA_6WQ_3xTd';
+
+// Helper: Supabase REST API call
+async function sbGet(table, params = {}) {
+  const url = new URL(`${SUPABASE_URL}/rest/v1/${table}`);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, v));
+  const res = await fetch(url.toString(), {
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + (authToken || SUPABASE_ANON_KEY),
+      'Content-Type': 'application/json'
+    }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function sbPost(table, body) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + (authToken || SUPABASE_ANON_KEY),
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function sbPatch(table, match, body) {
+  const url = new URL(`${SUPABASE_URL}/rest/v1/${table}`);
+  Object.entries(match).forEach(([k, v]) => url.searchParams.append(k, `eq.${v}`));
+  const res = await fetch(url.toString(), {
+    method: 'PATCH',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + (authToken || SUPABASE_ANON_KEY),
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function sbUpsert(table, body, onConflict) {
+  let url = `${SUPABASE_URL}/rest/v1/${table}`;
+  if (onConflict) {
+    url += `?on_conflict=${encodeURIComponent(onConflict)}`;
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + (authToken || SUPABASE_ANON_KEY),
+      'Content-Type': 'application/json',
+      'Prefer': `return=representation,resolution=merge-duplicates`
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function sbDelete(table, match) {
+  const url = new URL(`${SUPABASE_URL}/rest/v1/${table}`);
+  Object.entries(match).forEach(([k, v]) => url.searchParams.append(k, `eq.${v}`));
+  const res = await fetch(url.toString(), {
+    method: 'DELETE',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + (authToken || SUPABASE_ANON_KEY),
+      'Content-Type': 'application/json'
+    }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return true;
+}
+
+// Supabase Realtime — listener untuk update otomatis
+let realtimeChannel = null;
+function startRealtimeSync() {
+  if (realtimeChannel) return; // sudah aktif
+  // Gunakan native EventSource untuk Supabase Realtime (tidak perlu library)
+  // Kita poll ringan setiap 30 detik sebagai fallback universal
+  realtimeChannel = setInterval(async () => {
+    if (!authToken) return;
+    try {
+      await loadHistoryFromSheets();
+      renderCards();
+      renderOverview();
+    } catch(e) { /* silent */ }
+  }, 30000);
+}
+function stopRealtimeSync() {
+  if (realtimeChannel) { clearInterval(realtimeChannel); realtimeChannel = null; }
+}
 
 /* ============================================================
-   AUTH — LOGIN / LOGOUT via Apps Script
+   AUTO-REFRESH TOKEN
+   ------------------------------------------------------------
+   Access token Supabase punya masa berlaku terbatas (default 1 jam).
+   Tanpa mekanisme ini, sesi akan mati di tengah jalan — request
+   seperti Simpan Pengaturan akan gagal dengan 401, dan refresh
+   halaman berikutnya akan memaksa logout (lihat checkExistingSession).
+
+   Mekanisme ini mengecek setiap 1 menit apakah token akan expire
+   dalam waktu dekat (buffer 5 menit), dan jika iya, menukar
+   refresh_token untuk mendapatkan access_token baru SECARA
+   TRANSPARAN tanpa mengganggu user — sesi bisa bertahan berhari-hari
+   selama tab/sesi browser tidak ditutup, tanpa perlu login ulang.
+   ============================================================ */
+const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000; // refresh 5 menit sebelum expire
+
+async function refreshAuthToken(){
+  if(!authRefreshToken) return false;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: authRefreshToken })
+    });
+    const data = await res.json();
+    if(data.access_token){
+      authToken         = data.access_token;
+      authRefreshToken  = data.refresh_token || authRefreshToken;
+      authExpiresAt     = Date.now() + ((data.expires_in || 3600) * 1000);
+      sessionStorage.setItem('kpi_token',         authToken);
+      sessionStorage.setItem('kpi_refresh_token', authRefreshToken);
+      sessionStorage.setItem('kpi_expires_at',    String(authExpiresAt));
+      return true;
+    }
+    return false;
+  } catch(e){
+    console.warn('Gagal refresh token:', e.message);
+    return false;
+  }
+}
+
+// Pastikan token masih valid (atau berhasil di-refresh) sebelum operasi penting.
+// Dipakai sebagai pengaman tambahan sebelum aksi krusial seperti Simpan Pengaturan,
+// selain pengecekan rutin di background lewat startTokenRefreshTimer().
+async function ensureValidToken(){
+  if(!authToken) return false;
+  if(Date.now() < authExpiresAt - TOKEN_REFRESH_BUFFER_MS) return true; // masih jauh dari expire
+  return await refreshAuthToken();
+}
+
+let _tokenRefreshInterval = null;
+function startTokenRefreshTimer(){
+  if(_tokenRefreshInterval) return;
+  _tokenRefreshInterval = setInterval(async () => {
+    if(!authToken || !authExpiresAt) return;
+    if(Date.now() >= authExpiresAt - TOKEN_REFRESH_BUFFER_MS){
+      const ok = await refreshAuthToken();
+      if(!ok){
+        // Refresh token juga sudah tidak valid (mis. sudah lewat 30 hari) — minta login ulang
+        showToast('⚠️ Sesi berakhir, silakan login kembali.');
+        doLogout();
+      }
+    }
+  }, 60000); // cek setiap 1 menit
+}
+function stopTokenRefreshTimer(){
+  if(_tokenRefreshInterval){ clearInterval(_tokenRefreshInterval); _tokenRefreshInterval = null; }
+}
+
+/* ============================================================
+   AUTH — LOGIN / LOGOUT via Supabase
    ============================================================ */
 
-// State auth
+// State auth — simpan di sessionStorage agar bertahan refresh
 let authToken    = sessionStorage.getItem('kpi_token')    || null;
 let authUsername = sessionStorage.getItem('kpi_username') || null;
 let authName     = sessionStorage.getItem('kpi_name')     || null;
-
-async function asGet(params) {
-  const qs = Object.entries({...params, token: authToken})
-    .map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v||''))
-    .join('&');
-  const res = await fetch(AS_URL+'?'+qs);
-  return res.json();
-}
-
-async function asPost(payload) {
-  // Kirim sebagai FormData — menghindari CORS preflight
-  // Apps Script tidak support OPTIONS preflight dari browser
-  const form = new FormData();
-  form.append('payload', JSON.stringify({...payload, token: authToken}));
-  const res = await fetch(AS_URL, { method: 'POST', body: form });
-  return res.json();
-}
+let authRefreshToken = sessionStorage.getItem('kpi_refresh_token') || null;
+let authExpiresAt    = parseInt(sessionStorage.getItem('kpi_expires_at')) || 0;
+let _tokenRefreshTimer = null;
 
 async function doLogin() {
-  const username = document.getElementById('inp-user').value.trim();
+  const username = document.getElementById('inp-user').value.trim().toLowerCase();
   const password = document.getElementById('inp-pass').value;
   const errEl    = document.getElementById('login-err');
   const btn      = document.querySelector('.login-btn');
@@ -1211,19 +1505,30 @@ async function doLogin() {
   errEl.style.display = 'none';
 
   try {
-    const res = await asPost({ action: 'login', username, password });
-    if (res.status === 'ok') {
-      // Simpan sesi ke sessionStorage
-      authToken    = res.token;
-      authUsername = res.username;
-      authName     = res.name;
-      sessionStorage.setItem('kpi_token',    authToken);
-      sessionStorage.setItem('kpi_username', authUsername);
-      sessionStorage.setItem('kpi_name',     authName);
-      // Tampilkan dashboard
+    // Login ke Supabase Auth
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: username + '@narasi.tv', password })
+    });
+    const data = await res.json();
+    if (data.access_token) {
+      authToken    = data.access_token;
+      authUsername = username;
+      authRefreshToken = data.refresh_token || null;
+      // expires_in dalam detik dari sekarang; simpan sebagai timestamp absolut (ms since epoch)
+      authExpiresAt = Date.now() + ((data.expires_in || 3600) * 1000);
+      // Ambil nama tampilan dari tabel kpi_users
+      const userData = await sbGet('kpi_users', { username: `eq.${username}`, select: 'display_name' });
+      authName = (userData && userData[0]) ? userData[0].display_name : username;
+      sessionStorage.setItem('kpi_token',         authToken);
+      sessionStorage.setItem('kpi_username',      authUsername);
+      sessionStorage.setItem('kpi_name',          authName);
+      sessionStorage.setItem('kpi_refresh_token', authRefreshToken || '');
+      sessionStorage.setItem('kpi_expires_at',    String(authExpiresAt));
       showDashboard();
     } else {
-      errEl.textContent = res.message || 'Login gagal. Coba lagi.';
+      errEl.textContent = data.error_description || 'Username atau password salah.';
       errEl.style.display = 'block';
     }
   } catch(e) {
@@ -1236,11 +1541,21 @@ async function doLogin() {
 }
 
 async function doLogout() {
-  try { await asPost({ action: 'logout' }); } catch(e) {}
+  stopRealtimeSync();
+  stopTokenRefreshTimer();
+  try {
+    await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + authToken }
+    });
+  } catch(e) {}
   sessionStorage.removeItem('kpi_token');
   sessionStorage.removeItem('kpi_username');
   sessionStorage.removeItem('kpi_name');
-  authToken = authUsername = authName = null;
+  sessionStorage.removeItem('kpi_refresh_token');
+  sessionStorage.removeItem('kpi_expires_at');
+  authToken = authUsername = authName = authRefreshToken = null;
+  authExpiresAt = 0;
   document.getElementById('dashboard-page').style.display = 'none';
   document.getElementById('login-page').style.display     = 'flex';
   document.getElementById('inp-user').value = '';
@@ -1251,12 +1566,13 @@ async function doLogout() {
 function showDashboard() {
   document.getElementById('login-page').style.display     = 'none';
   document.getElementById('dashboard-page').style.display = 'block';
-  // Tampilkan nama user di topbar
   const uEl = document.getElementById('topbar-username');
   if (uEl && authName) uEl.textContent = '👋 ' + authName;
   const subEl = document.getElementById('topbar-sub');
   if (subEl) subEl.textContent = 'Digital Marketing Team';
   init();
+  startRealtimeSync();
+  startTokenRefreshTimer();
 }
 
 // Enter key di password field
@@ -1269,35 +1585,42 @@ document.addEventListener('DOMContentLoaded', function() {
   if (userEl) userEl.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') document.getElementById('inp-pass').focus();
   });
-  // Cek apakah sudah ada sesi tersimpan
   checkExistingSession();
 });
 
 async function checkExistingSession() {
   setLoadStatus('Memeriksa sesi...', 30);
   if (!authToken) {
-    // Tidak ada sesi — tampilkan login
     hideLoading();
     document.getElementById('login-page').style.display = 'flex';
     return;
   }
-  // Ada token — verifikasi ke server
+  // Verifikasi token ke Supabase
   try {
-    const res = await asGet({ action: 'ping' });
-    if (res.status === 'ok') {
-      // Token masih valid — langsung ke dashboard
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + authToken }
+    });
+    if (res.ok) {
       setLoadStatus('Memuat data...', 70);
       hideLoading();
       showDashboard();
     } else {
-      // Token expired
-      sessionStorage.clear();
-      authToken = null;
-      hideLoading();
-      document.getElementById('login-page').style.display = 'flex';
+      // Token tidak valid (kemungkinan sudah expired) — JANGAN langsung logout.
+      // Coba refresh dulu menggunakan refresh_token; ini akar dari bug "tiba-tiba
+      // logout setelah refresh halaman" yang terjadi sebelumnya.
+      const refreshed = await refreshAuthToken();
+      if (refreshed) {
+        setLoadStatus('Memuat data...', 70);
+        hideLoading();
+        showDashboard();
+      } else {
+        sessionStorage.clear();
+        authToken = null;
+        hideLoading();
+        document.getElementById('login-page').style.display = 'flex';
+      }
     }
   } catch(e) {
-    // Tidak bisa ping server — tetap tampilkan login
     hideLoading();
     document.getElementById('login-page').style.display = 'flex';
   }
@@ -1380,8 +1703,10 @@ const live={actuals:{},targets:{},notes:{}};
 const submitted={};
 let historyData=[];
 let histId=0;
-const ui={period:'weekly',trend:'traffic',histPeriod:'weekly',filterPeriod:'',filterPic:''};
+const ui={period:'weekly',trend:'traffic',histPeriod:'weekly',filterPeriod:'',filterPic:'',
+  dashActivePeriodType:'weekly',dashActivePeriodLabel:''};
 let trendChart=null;
+let forecastChart=null;
 
 /* DASHBOARD CONFIG — dikontrol dari Settings */
 let dashboardConfig = {
@@ -1579,8 +1904,8 @@ function exportCSV(){
       const av=getAvForCard(pic,m,cp,picSelectedLabel[pic.id+'_'+cp]||getCurrentWeekLabel());
       const tv=getTvForCard(pic,m,cp,picSelectedLabel[pic.id+'_'+cp]||getCurrentWeekLabel());
       const status=m.optional?'opsional':getStatus(av,tv,!!m.lowerBetter);
-      const notes=(live.notes[m.key+'_'+cp+'_n']||'').replace(/\n/g,' ');
-      csv+=pic.name+','+pic.role+',"'+m.label+'","'+av+'","'+tv+'",'+status+',"'+notes+'"\n';
+      const notes=(live.notes[m.key+'_'+cp+'_n']||'').replace(/\n/g,' ').replace(/"/g,"'");
+      csv+='"'+pic.name+'","'+pic.role+'","'+m.label+'","'+av+'","'+tv+'",'+status+',"'+notes+'"\n';
     });
   });
   dlCSV(csv,'narasi_kpi_'+today()+'.csv');
@@ -1596,9 +1921,13 @@ async function loadHistoryFromSheets(){
   if(tbody) tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--tx3)">⏳ Memuat data dari server...</td></tr>';
 
   try{
-    const res=await asGet({action:'load_entries'});
-    if(res.status==='ok' && res.data && res.data.length>0){
-      res.data.forEach(row=>{
+    // Load dari Supabase tabel kpi_entries — urutkan by period_label dan metric_key
+    const rows = await sbGet('kpi_entries', {
+      select: '*',
+      order: 'created_at.asc'
+    });
+    if(rows && rows.length > 0){
+      rows.forEach(row=>{
         const existsIdx=historyData.findIndex(h=>
           h.pic===row.pic_name && h.period===row.period_label && h.key===row.metric_key
         );
@@ -1606,6 +1935,7 @@ async function loadHistoryFromSheets(){
         const hM=hPic?hPic.metrics.find(x=>x.key===row.metric_key):null;
         const entry={
           id:          existsIdx>=0?historyData[existsIdx].id:++histId,
+          sheets_id:   row.id,  // simpan UUID Supabase untuk operasi edit/delete
           period:      row.period_label,
           periodType:  row.period_type,
           pic:         row.pic_name,
@@ -1617,8 +1947,14 @@ async function loadHistoryFromSheets(){
           target:      row.target,
           prev:        null,
           notes:       row.notes||'',
-          lowerBetter: hM?!!hM.lowerBetter:false,
-          ts:          row.timestamp
+          // Pakai nilai yang sudah di-freeze di database (kolom lower_better di kpi_entries).
+          // Fallback ke setting global PICS HANYA untuk baris lama yang belum punya nilai
+          // tersimpan (null/undefined) — yaitu data yang disubmit sebelum migrasi kolom ini
+          // ditambahkan. Baris baru selalu memakai nilai yang dibekukan saat submit.
+          lowerBetter: (row.lower_better !== null && row.lower_better !== undefined)
+            ? !!row.lower_better
+            : (hM ? !!hM.lowerBetter : false),
+          ts:          row.created_at
         };
         if(existsIdx>=0) historyData[existsIdx]=entry;
         else historyData.push(entry);
@@ -1630,14 +1966,12 @@ async function loadHistoryFromSheets(){
       });
     }
   } catch(e){
-    console.warn('Gagal load dari Sheets:',e.message);
+    console.warn('Gagal load dari Supabase:',e.message);
   }
-  // Hanya render history panel jika sedang aktif
   const histPanel = document.getElementById('panel-history');
   if(histPanel && histPanel.classList.contains('active')){
     renderHistory();
   }
-  // renderCards dan renderOverview dipanggil oleh caller (init/switchTab)
 }
 
 /* ============================================================
@@ -1684,9 +2018,10 @@ function exportHistCSV(){
   data.forEach(r=>{
     const g = calcGrowth(r.actual, r.prev);
     const gStr = g!==null ? g.toFixed(1)+'%' : '–';
-    const status = getStatus(r.actual, r.target, !!r.lowerBetter);
+    const eTarget = getEffectiveTarget(r);
+    const status = getStatus(r.actual, eTarget, !!r.lowerBetter);
     csv += '"'+r.period+'","'+r.pic+'","'+r.role+'","'+r.obj+'","'
-      +(r.target||'–')+'","'+(r.actual||'–')+'","'+gStr+'","'
+      +eTarget+'","'+(r.actual||'–')+'","'+gStr+'","'
       +status+'","'+(r.notes||'').replace(/"/g,"'")+'"\n';
   });
   dlCSV(csv, 'narasi_histori_kpi_'+today()+'.csv');
@@ -1719,7 +2054,7 @@ function renderHistory(){
     const m=PICS.flatMap(p=>p.metrics).find(x=>x.key===r.key);
     if(m?.category==='Revenue') totRev+=parseRaw(r.actual)||0;
     if(m?.category==='Traffic') totTraffic+=parseRaw(r.actual)||0;
-    if(getStatus(r.actual,r.target,!!r.lowerBetter)==='green') ontrackCount++;
+    if(getStatus(r.actual,getEffectiveTarget(r),!!r.lowerBetter)==='green') ontrackCount++;
   });
   const pct=totEntries>0?Math.round(ontrackCount/totEntries*100):0;
   const setStat=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
@@ -1727,7 +2062,7 @@ function renderHistory(){
   let totOntrack=0, totOfftrack=0;
   data.forEach(r=>{
     if(!r.actual||r.actual==='–') return;
-    const s=getStatus(r.actual,r.target,!!r.lowerBetter);
+    const s=getStatus(r.actual,getEffectiveTarget(r),!!r.lowerBetter);
     if(s==='green') totOntrack++;
     else if(s==='red') totOfftrack++;
   });
@@ -1769,7 +2104,9 @@ function renderHistory(){
       const bg=i%2===0?'#fff':'#FAFAFE';
       const ps=PIC_STYLES[r.pic]||{animal:'👤',bg:'#F0EFF8',color:'#534AB7'};
       const rs=ROLE_COLORS[r.role]||'background:#F0EFF8;color:#534AB7;';
-      const status=getStatus(r.actual,r.target,!!r.lowerBetter);
+      const eTarget=getEffectiveTarget(r);
+      const targetFollowsGlobal = (!r.target || r.target==='–') && eTarget!=='–';
+      const status=getStatus(r.actual,eTarget,!!r.lowerBetter);
       const g=calcGrowth(r.actual,r.prev);
       let gb;
       if(g===null) gb='<span class="gbadge zero">–</span>';
@@ -1794,7 +2131,7 @@ function renderHistory(){
         <td class="r">
           <div class="val-block">
             <span class="val-actual">${r.actual||'–'}</span>
-            <span class="val-target">Target: ${r.target||'–'}</span>
+            <span class="val-target">Target: ${eTarget}${targetFollowsGlobal?' <span title="Target belum diset saat submit — mengikuti target terkini" style="cursor:help">🔄</span>':''}</span>
           </div>
         </td>
         <td class="c">${gb}</td>
@@ -1822,8 +2159,8 @@ function deleteRow(id){
   historyData=historyData.filter(r=>r.id!==id);
   renderHistory();
   showToast('🗑 Data dihapus dari histori.');
-  if(row&&row.sheets_id){
-    asPost({action:'delete_entry',id:row.sheets_id}).catch(()=>{});
+  if(row && row.sheets_id){
+    sbDelete('kpi_entries', { id: row.sheets_id }).catch(e=>console.warn('Delete error:', e.message));
   }
 }
 
@@ -1844,6 +2181,18 @@ function openEditModal(id){
   document.getElementById('modal-target').value  = r.target  || '';
   document.getElementById('modal-prev').value    = r.prev!==null && r.prev!==undefined ? r.prev : '';
   document.getElementById('modal-notes').value   = r.notes   || '';
+
+  // Hint: jika target kosong, baris ini mengikuti target global terkini
+  const eTarget = getEffectiveTarget(r);
+  const hintEl = document.getElementById('modal-target-hint');
+  if(hintEl){
+    if((!r.target || r.target==='–') && eTarget!=='–'){
+      hintEl.style.display='block';
+      hintEl.textContent='🔄 Saat ini mengikuti target terkini: '+eTarget+'. Isi field di atas untuk membekukan target khusus periode ini.';
+    } else {
+      hintEl.style.display='none';
+    }
+  }
   document.getElementById('edit-modal').style.display = 'flex';
 }
 
@@ -1875,12 +2224,11 @@ function saveModal(){
   renderHistory();
   showToast('✅ Data histori diperbarui.');
 
-  // Sync to Sheets if entry has sheets ID
+  // Sync to Supabase if entry has sheets_id
   if(r.sheets_id){
-    asPost({
-      action:'update_entry', id:r.sheets_id,
-      actual:r.actual, target:r.target, notes:r.notes, period_label:r.period
-    }).catch(()=>{});
+    sbPatch('kpi_entries', {id: r.sheets_id}, {
+      actual: r.actual, target: r.target, notes: r.notes
+    }).catch(e=>console.warn('Update error:', e.message));
   }
 }
 
@@ -2080,8 +2428,34 @@ function getTvForCard(pic, m, pType, periodLabel){
   if(hist && hist.target && hist.target !== '–') return hist.target;
   return getTargetForPeriod(pic, m, pType);
 }
+
+/* ============================================================
+   TARGET RESOLUTION UNTUK BARIS HISTORI (historyData)
+   ------------------------------------------------------------
+   Aturan: target yang SUDAH diisi secara eksplisit saat submit
+   tetap dibekukan ("freeze") — ini benar secara historis, supaya
+   laporan periode lama tidak berubah-ubah hanya karena target
+   direvisi belakangan.
+
+   TAPI: jika target waktu itu kosong/'–' (misal karena target
+   memang belum ditetapkan tim saat periode tersebut berjalan),
+   maka baris itu mengikuti target GLOBAL yang berlaku saat ini.
+   Begitu target global diisi/diubah di Pengaturan KPI, baris-baris
+   lama yang targetnya masih kosong otomatis ikut menyesuaikan.
+   ============================================================ */
+function getEffectiveTarget(r){
+  if(r.target && r.target !== '–') return r.target; // sudah eksplisit di-set saat submit — freeze
+  const pic = PICS.find(p=>p.id===r.pic_id || p.name===r.pic);
+  const m   = pic ? pic.metrics.find(x=>x.key===r.key) : null;
+  if(m && m.target && m.target[r.periodType] && m.target[r.periodType] !== '–'){
+    return m.target[r.periodType]; // ikuti target global terkini
+  }
+  return r.target || '–'; // tidak ada target sama sekali (global pun belum diset)
+}
+
 function getNvForCard(pic, m, pType, periodLabel){
   const live_v = getLiveNotesForLabel(m.key, pType, periodLabel);
+
   if(live_v) return live_v;
   const hist = getHistoricActual(pic.id, m.key, periodLabel);
   return hist?hist.notes||'':'';
@@ -2594,6 +2968,7 @@ function submitPICForLabel(picId, pType, periodLabel){
   picShowForm[picId+'_'+pType+'_'+periodLabel]=false;
   renderCards();
   showToast('✅ Data '+pic.name+' ('+periodLabel+') tersimpan!');
+  rebuildForecastMetricSelect(); // historyData baru bertambah — refresh opsi forecast
   syncSubmitToSheetsLabel(pic, pType, periodLabel);
 }
 
@@ -2634,18 +3009,31 @@ function showOverwriteConfirm(picId, pType, periodLabel, picName){
 
 async function syncSubmitToSheetsLabel(pic, pType, periodLabel){
   try{
-    const entries=pic.metrics.filter(m=>!m.optional).map(m=>({
+    const entries = pic.metrics.filter(m=>!m.optional).map(m=>({
+      pic_id:       pic.id,
+      pic_name:     pic.name,
+      period_type:  pType,
+      period_label: periodLabel,
       metric_key:   m.key,
       metric_label: m.label,
       actual:  getAvForCard(pic,m,pType,periodLabel),
       target:  getTvForCard(pic,m,pType,periodLabel),
+      lower_better: !!m.lowerBetter,
       notes:   getNvForCard(pic,m,pType,periodLabel)
-    }));
-    const res=await asPost({action:'submit_kpi',pic_id:pic.id,pic_name:pic.name,
-      period_type:pType,period_label:periodLabel,entries});
-    if(res.status==='ok') showToast('✅ Data tersimpan ke Sheets!');
-    else showToast('⚠️ Lokal tersimpan, gagal sync: '+(res.message||''));
-  }catch(e){showToast('⚠️ Lokal tersimpan, gagal sync ke Sheets.');}
+    })).filter(e => e.actual !== '–' || e.target !== '–');
+
+    // Upsert: hapus dulu entri lama untuk pic+period ini, lalu insert baru
+    // Ini menghindari duplikasi dan aman untuk multi-browser (last-write-wins per periode)
+    await sbDelete('kpi_entries', { pic_id: pic.id, period_label: periodLabel, period_type: pType })
+      .catch(()=>{}); // ignore jika belum ada
+
+    if(entries.length > 0){
+      await sbPost('kpi_entries', entries);
+    }
+    showToast('✅ Data tersimpan ke Supabase!');
+  } catch(e){
+    showToast('⚠️ Lokal tersimpan, gagal sync: '+e.message);
+  }
 }
 
 /* submitPIC (legacy) removed — use submitPICForLabel */
@@ -2675,9 +3063,42 @@ function setTrend(t){
    ============================================================ */
 
 function renderOverview(){
+  populateDashActivePeriodDropdown();
   renderSummaryCards();
   drawTrend();
   updateOverviewRangeLabel();
+}
+
+// Dropdown "Periode Aktif" di infobar — independen dari filter rentang grafik tren
+function populateDashActivePeriodDropdown(){
+  const sel = document.getElementById('dash-active-period');
+  if(!sel) return;
+
+  // List periode dari WEEKLY_LABELS + MONTHLY_LABELS, tag dengan tipenya
+  const wLabels = (WEEKLY_LABELS.length ? WEEKLY_LABELS : buildWeeklyLabels());
+  const mLabels = (MONTHLY_LABELS.length ? MONTHLY_LABELS : buildMonthlyLabels());
+
+  // Default: minggu/bulan berjalan saat ini, kalau belum pernah dipilih user
+  if(!ui.dashActivePeriodLabel){
+    ui.dashActivePeriodType  = 'weekly';
+    ui.dashActivePeriodLabel = getCurrentWeekLabel();
+  }
+
+  const wOpts = wLabels.slice(-12).reverse().map(l=>
+    `<option value="weekly|${l}"${ui.dashActivePeriodType==='weekly'&&ui.dashActivePeriodLabel===l?' selected':''}>📅 ${l}${l===getCurrentWeekLabel()?' (berjalan)':''}</option>`
+  ).join('');
+  const mOpts = mLabels.slice(-12).reverse().map(l=>
+    `<option value="monthly|${l}"${ui.dashActivePeriodType==='monthly'&&ui.dashActivePeriodLabel===l?' selected':''}>📆 ${l}${l===getCurrentMonthLabel()?' (berjalan)':''}</option>`
+  ).join('');
+
+  sel.innerHTML = `<optgroup label="Weekly">${wOpts}</optgroup><optgroup label="Monthly">${mOpts}</optgroup>`;
+}
+
+function setDashActivePeriod(value){
+  const [pType, label] = value.split('|');
+  ui.dashActivePeriodType  = pType;
+  ui.dashActivePeriodLabel = label;
+  renderSummaryCards();
 }
 
 function renderSummaryCards(){
@@ -2685,9 +3106,9 @@ function renderSummaryCards(){
   if(!grid) return;
 
   const groups = dashboardConfig.metricsGroups;
-  const pType  = dashboardConfig.timeFilter.periodType;
-  const periods = getOverviewPeriodList();
-  const curLabel = periods.length ? periods[periods.length-1] : '';
+  // Dikontrol oleh dropdown "Periode Aktif" di infobar, BUKAN filter rentang grafik tren
+  const pType  = ui.dashActivePeriodType;
+  const curLabel = ui.dashActivePeriodLabel;
 
   // Empty state jika belum ada group
   if(!groups || groups.length===0){
@@ -3042,7 +3463,7 @@ function renderDashConfig(){
     </div>
     <div style="margin-top:10px;padding:10px 14px;background:var(--pl);border-radius:var(--r);font-size:12px;color:var(--p)">
       💡 Group akan tampil sebagai <strong>summary card</strong> dan <strong>tab grafik</strong> di halaman utama.
-      Klik <strong>Simpan Konfigurasi</strong> agar tersimpan ke Google Sheets.
+      Klik <strong>Simpan Konfigurasi</strong> agar tersimpan ke Supabase.
     </div>`;
 }
 
@@ -3110,6 +3531,10 @@ function switchTab(tab){
     if(panel) panel.classList.toggle('active', t===tab);
     if(btn)   btn.classList.toggle('active', t===tab);
   });
+  // Tombol "Export CSV" di topbar hanya relevan untuk tab Dashboard (snapshot kartu KPI saat ini).
+  // Tab Histori dan Forecasting sudah punya tombol export kontekstual masing-masing.
+  const topbarExportBtn = document.getElementById('topbar-export-btn');
+  if(topbarExportBtn) topbarExportBtn.style.display = (tab==='dashboard') ? '' : 'none';
   if(tab==='dashboard') { renderCards(); renderOverview(); }
   if(tab==='history')   { loadHistoryFromSheets().then(()=>renderHistory()); }
   if(tab==='settings')  renderSettings();
@@ -3139,9 +3564,11 @@ let settingsActivePic = PICS[0].id;
 let settingsMetricCounter = 1000; // for generating unique keys
 
 function inferType(m){
-  // Detect by existing actual/target values
-  const sample = m.actual.weekly || m.actual.monthly || '';
-  if(sample.toLowerCase().includes('rp') || sample.includes('Rp')) return 'rupiah';
+  // Detect by existing actual/target values. Cek actual dulu (lebih akurat kalau ada data nyata),
+  // tapi kalau actual masih kosong (metrik belum pernah disubmit), fallback ke target — karena
+  // target sering sudah diisi sejak awal dan membawa info format (Rp/%) yang sama validnya.
+  const sample = m.actual.weekly || m.actual.monthly || m.target.weekly || m.target.monthly || '';
+  if(sample.toLowerCase().includes('rp')) return 'rupiah';
   if(sample.includes('%')) return 'persen';
   return 'angka';
 }
@@ -3161,7 +3588,13 @@ function renderSettings(){
   if(!pic||!sd) return;
 
   const rows = sd.metrics.map((m,i)=>`
-    <tr>
+    <tr draggable="true" data-idx="${i}"
+      ondragstart="dragMetricStart(event,${i})"
+      ondragover="dragMetricOver(event)"
+      ondragleave="dragMetricLeave(event)"
+      ondrop="dragMetricDrop(event,${i})"
+      ondragend="dragMetricEnd(event)">
+      <td style="width:28px;text-align:center;cursor:grab;color:var(--tx3);font-size:15px" title="Geser untuk mengubah urutan">⠿</td>
       <td style="width:28px;text-align:center">
         <input type="checkbox" class="s-chk" ${m.optional?'':'checked'}
           onchange="toggleSettingsOptional('${sd.id}',${i},!this.checked)"
@@ -3218,6 +3651,7 @@ function renderSettings(){
       <div style="overflow-x:auto">
         <table class="s-table">
           <thead><tr>
+            <th style="width:28px"></th>
             <th style="text-align:center" title="Aktif">✓</th>
             <th>Nama Metrik</th>
             <th>Tipe Data</th>
@@ -3226,11 +3660,12 @@ function renderSettings(){
             <th title="Centang jika nilai LEBIH KECIL = lebih baik (CPC, Ad Spend, dll)">↓ Lebih Kecil = Baik</th>
             <th></th>
           </tr></thead>
-          <tbody>${rows}</tbody>
+          <tbody id="settings-metrics-tbody">${rows}</tbody>
         </table>
       </div>
       <div style="padding:10px 14px;background:#FAFAFE;border-top:1px solid var(--border);font-size:11px;color:var(--tx3)">
         ✓ = metrik aktif diikutsertakan dalam dashboard &amp; histori KPI.
+        Geser ikon <strong>⠿</strong> untuk mengubah urutan metrik — urutan ini akan berlaku di Dashboard, Histori, dan Forecasting.
         Centang "<em>↓ lebih baik</em>" untuk metrik seperti CPC atau Ad Spend.
       </div>
     </div>
@@ -3242,6 +3677,57 @@ function renderSettings(){
 function setSettingsPic(picId){
   settingsActivePic=picId;
   renderSettings();
+}
+
+/* ============================================================
+   DRAG & DROP — Urutkan Metrik di Pengaturan KPI
+   ------------------------------------------------------------
+   Urutan ditentukan di sini (settingsData.metrics array), dan
+   begitu disimpan lewat applySettings(), urutan ini otomatis
+   ikut berlaku di Dashboard, Histori, dan Forecasting — karena
+   semuanya membaca urutan pic.metrics yang sama.
+   ============================================================ */
+let _dragMetricIdx = null;
+
+function dragMetricStart(e, idx){
+  _dragMetricIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(idx)); // perlu utk Firefox
+  e.currentTarget.classList.add('dragging-row');
+}
+
+function dragMetricOver(e){
+  e.preventDefault(); // wajib, supaya drop event bisa terjadi
+  e.dataTransfer.dropEffect = 'move';
+  const row = e.currentTarget;
+  if(!row.classList.contains('drag-over')) row.classList.add('drag-over');
+}
+
+function dragMetricLeave(e){
+  e.currentTarget.classList.remove('drag-over');
+}
+
+function dragMetricDrop(e, dropIdx){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if(_dragMetricIdx === null || _dragMetricIdx === dropIdx) return;
+
+  const sd = settingsData.find(s=>s.id===settingsActivePic);
+  if(!sd) return;
+
+  const [moved] = sd.metrics.splice(_dragMetricIdx, 1);
+  sd.metrics.splice(dropIdx, 0, moved);
+
+  _dragMetricIdx = null;
+  renderSettings();
+  showToast('↕️ Urutan metrik diubah — klik Simpan Pengaturan untuk menerapkannya.');
+}
+
+function dragMetricEnd(e){
+  e.currentTarget.classList.remove('dragging-row');
+  document.querySelectorAll('#settings-metrics-tbody tr.drag-over')
+    .forEach(r=>r.classList.remove('drag-over'));
+  _dragMetricIdx = null;
 }
 
 function updateSettingsField(picId, idx, field, value){
@@ -3303,7 +3789,53 @@ function formatTargetByType(rawVal, type){
   return num.toLocaleString('id-ID');
 }
 
-function applySettings(){
+async function applySettings(){
+  // ============================================================
+  // STEP 0: Pastikan token masih valid SEBELUM mulai proses simpan.
+  // Ini mengatasi skenario: edit banyak pengaturan (butuh waktu lama),
+  // token expired di tengah jalan, lalu Simpan gagal dengan error 401.
+  // ============================================================
+  await ensureValidToken();
+
+  // ============================================================
+  // STEP 1: Deteksi perubahan target SEBELUM menimpa PICS,
+  // supaya kita masih punya nilai LAMA untuk dibandingkan.
+  // ============================================================
+  const targetChanges = []; // { key, label, periodType, oldTarget, newTarget, picIds:[...] }
+
+  settingsData.forEach(sd=>{
+    const pic = PICS.find(p=>p.id===sd.id);
+    if(!pic) return;
+    sd.metrics.forEach(sm=>{
+      const oldM = pic.metrics.find(x=>x.key===sm.key);
+      const newTw = formatTargetByType(sm.targetWeekly,  sm.type);
+      const newTm = formatTargetByType(sm.targetMonthly, sm.type);
+
+      [['weekly', oldM?.target?.weekly, newTw], ['monthly', oldM?.target?.monthly, newTm]].forEach(([pType, oldVal, newVal])=>{
+        const oldNorm = oldVal || '–';
+        const newNorm = newVal || '–';
+        // Hanya relevan kalau target LAMA sudah eksplisit ada (bukan kosong) DAN nilainya BENAR-BENAR
+        // berbeda secara substansi. Bandingkan angka ternormalisasi (parseRaw), bukan string mentah,
+        // supaya perbedaan format murni (mis. "Rp 18.000.000" vs "18.000.000" karena re-format type)
+        // tidak salah dianggap sebagai revisi target oleh user.
+        const oldNum = parseRaw(oldNorm);
+        const newNum = parseRaw(newNorm);
+        const genuinelyChanged = oldNorm !== '–' && oldNum !== null && newNum !== null && oldNum !== newNum;
+        if(genuinelyChanged){
+          let entry = targetChanges.find(c=>c.key===sm.key && c.periodType===pType);
+          if(!entry){
+            entry = { key: sm.key, label: sm.label, periodType: pType, oldTarget: oldNorm, newTarget: newNorm, picIds: [] };
+            targetChanges.push(entry);
+          }
+          if(!entry.picIds.includes(pic.id)) entry.picIds.push(pic.id);
+        }
+      });
+    });
+  });
+
+  // ============================================================
+  // STEP 2: Terapkan settings baru ke PICS (perilaku asli, tidak berubah)
+  // ============================================================
   settingsData.forEach(sd=>{
     const pic=PICS.find(p=>p.id===sd.id);
     if(!pic) return;
@@ -3329,14 +3861,165 @@ function applySettings(){
   showToast('✅ Pengaturan diterapkan. Menyimpan ke Sheets...');
   syncSettingsToSheets();
   syncDashboardConfigToSheets();
+
+  // ============================================================
+  // STEP 3: Kalau ada perubahan target yang relevan terhadap histori,
+  // tampilkan dialog konfirmasi retroaktif. Settings & sync di atas
+  // SUDAH berjalan terlepas dari ini — dialog ini murni opsional
+  // untuk histori, tidak menghalangi proses simpan utama.
+  // ============================================================
+  if(targetChanges.length){
+    openRtrModal(targetChanges);
+  }
 }
+
+/* ============================================================
+   REVISI TARGET RETROAKTIF — "Terapkan ke Histori"
+   ------------------------------------------------------------
+   Dipanggil dari applySettings() saat target sebuah metrik yang
+   SUDAH eksplisit ada nilainya (bukan kosong) berubah nilainya.
+   Tujuan: beri pilihan EKSPLISIT ke user untuk menerapkan target
+   baru itu ke periode lama yang sudah freeze, tanpa mengubahnya
+   secara otomatis/diam-diam.
+   ============================================================ */
+let _rtrAffectedRows = []; // flat list of historyData rows + metadata terdampak, dgn state checkbox
+
+function openRtrModal(targetChanges){
+  // Untuk setiap perubahan target, cari baris historyData yang match
+  // (pic terdampak, metric key sama, periodType sama, dan target row
+  // saat ini SAMA dengan target lama — supaya kalau baris itu sudah
+  // di-custom manual ke nilai lain, tetap dianggap "freeze" dan masuk
+  // daftar dengan keterangan, bukan diabaikan diam-diam).
+  _rtrAffectedRows = [];
+  targetChanges.forEach(change=>{
+    historyData.forEach(r=>{
+      if(r.key !== change.key) return;
+      if(r.periodType !== change.periodType) return;
+      if(!change.picIds.includes(r.pic_id)) return;
+      _rtrAffectedRows.push({
+        rowId: r.id,
+        period: r.period,
+        periodType: r.periodType,
+        picName: r.pic,
+        picId: r.pic_id,
+        metricKey: change.key,
+        metricLabel: change.label,
+        oldTarget: r.target || '–',
+        newTarget: change.newTarget,
+        checked: false
+      });
+    });
+  });
+
+  if(!_rtrAffectedRows.length){
+    return; // tidak ada histori yang terdampak — tidak perlu tampilkan modal
+  }
+
+  renderRtrList();
+  document.getElementById('rtr-modal').style.display = 'flex';
+}
+
+function renderRtrList(){
+  const container = document.getElementById('rtr-list-container');
+  if(!container) return;
+
+  if(!_rtrAffectedRows.length){
+    container.innerHTML = '<div class="rtr-empty-state">Tidak ada histori yang terdampak.</div>';
+    return;
+  }
+
+  // Group by period untuk header per-periode + checkbox "semua metrik periode ini"
+  const byPeriod = {};
+  _rtrAffectedRows.forEach((row, idx)=>{
+    if(!byPeriod[row.period]) byPeriod[row.period] = [];
+    byPeriod[row.period].push(idx);
+  });
+
+  const periods = Object.keys(byPeriod).sort((a,b)=>parsePeriodLabel(b)-parsePeriodLabel(a));
+
+  let html = '<table class="rtr-table"><thead><tr>'+
+    '<th style="width:34px"></th><th>Metrik &amp; PIC</th><th>Target Lama → Baru</th>'+
+    '</tr></thead><tbody>';
+
+  periods.forEach(period=>{
+    const idxs = byPeriod[period];
+    const allChecked = idxs.every(i=>_rtrAffectedRows[i].checked);
+    html += `<tr class="rtr-period-group"><td colspan="3">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" class="rtr-checkbox" ${allChecked?'checked':''} onchange="rtrToggleAllForPeriod('${period.replace(/'/g,"\\'")}', this.checked)"/>
+        📅 ${period} <span style="font-weight:400;color:var(--tx3);text-transform:none">— terapkan ke semua metrik di periode ini</span>
+      </label>
+    </td></tr>`;
+
+    idxs.forEach(i=>{
+      const row = _rtrAffectedRows[i];
+      html += `<tr>
+        <td><input type="checkbox" class="rtr-checkbox" ${row.checked?'checked':''} onchange="rtrToggleRow(${i}, this.checked)"/></td>
+        <td>
+          <div style="font-weight:600;color:var(--tx)">${row.metricLabel}</div>
+          <span class="rtr-pic-tag">${row.picName}</span>
+        </td>
+        <td><span class="rtr-old">${row.oldTarget}</span><span class="rtr-arrow">→</span><span class="rtr-new">${row.newTarget}</span></td>
+      </tr>`;
+    });
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function rtrToggleRow(idx, checked){
+  if(_rtrAffectedRows[idx]) _rtrAffectedRows[idx].checked = checked;
+  renderRtrList(); // re-render supaya checkbox header "per periode" ikut update statusnya
+}
+
+function rtrToggleAllForPeriod(period, checked){
+  _rtrAffectedRows.forEach(row=>{ if(row.period === period) row.checked = checked; });
+  renderRtrList();
+}
+
+function rtrSelectAll(checked){
+  _rtrAffectedRows.forEach(row=>{ row.checked = checked; });
+  renderRtrList();
+}
+
+function applyRtrSelection(){
+  const selected = _rtrAffectedRows.filter(r=>r.checked);
+  if(!selected.length){
+    showToast('ℹ️ Tidak ada periode yang dipilih — histori tetap memakai target lama.');
+    closeRtrModal();
+    return;
+  }
+
+  selected.forEach(sel=>{
+    const r = historyData.find(h=>h.id===sel.rowId);
+    if(!r) return;
+    r.target = sel.newTarget;
+    // Sync ke Supabase — update target untuk baris ini (fire-and-forget, konsisten dgn pola submit lain)
+    if(r.sheets_id){
+      sbPatch('kpi_entries', {id: r.sheets_id}, {target: sel.newTarget})
+        .catch(e=>console.warn('Gagal sync revisi target retroaktif:', e.message));
+    }
+  });
+
+  renderHistory();
+  renderCards();
+  renderOverview();
+  showToast(`✅ Target baru diterapkan ke ${selected.length} periode histori.`);
+  closeRtrModal();
+}
+
+function closeRtrModal(){
+  document.getElementById('rtr-modal').style.display = 'none';
+  _rtrAffectedRows = [];
+}
+
 
 async function syncSettingsToSheets() {
   try {
-    // Flatten semua metrics dari semua PICs
     const settings = [];
     PICS.forEach(pic => {
-      pic.metrics.forEach(m => {
+      pic.metrics.forEach((m, idx) => {
         settings.push({
           pic_id:         pic.id,
           metric_key:     m.key,
@@ -3345,44 +4028,38 @@ async function syncSettingsToSheets() {
           lower_better:   !!m.lowerBetter,
           optional:       !!m.optional,
           target_weekly:  m.target.weekly  || '',
-          target_monthly: m.target.monthly || ''
+          target_monthly: m.target.monthly || '',
+          sort_order:     idx
         });
       });
     });
-    const res = await asPost({ action: 'save_settings', settings });
-    if (res.status === 'ok') {
-      showToast('✅ Pengaturan KPI berhasil disimpan ke Sheets!');
-    } else {
-      showToast('⚠️ Pengaturan diterapkan lokal, gagal sync: '+(res.message||''));
-    }
+    // Upsert semua settings sekaligus (conflict pada pic_id+metric_key)
+    await sbUpsert('kpi_settings', settings, 'pic_id,metric_key');
+    showToast('✅ Pengaturan KPI berhasil disimpan ke Supabase!');
   } catch(e) {
-    showToast('⚠️ Pengaturan diterapkan lokal, gagal sync ke Sheets.');
+    showToast('⚠️ Pengaturan diterapkan lokal, gagal sync: '+e.message);
   }
 }
 
 async function syncDashboardConfigToSheets(){
   try {
-    const res = await asPost({
-      action: 'save_dashboard_config',
-      config: dashboardConfig
-    });
-    if(res.status==='ok'){
-      showToast('✅ Konfigurasi dashboard tersimpan ke Sheets!');
-    } else {
-      showToast('⚠️ Config lokal tersimpan, gagal sync: '+(res.message||''));
-    }
+    // Simpan config sebagai 1 row dengan key='dashboard_config'
+    await sbUpsert('kpi_app_config', [{
+      config_key: 'dashboard_config',
+      config_value: JSON.stringify(dashboardConfig)
+    }], 'config_key');
+    showToast('✅ Konfigurasi dashboard tersimpan ke Supabase!');
   } catch(e){
-    showToast('⚠️ Config lokal tersimpan, gagal sync ke Sheets.');
+    showToast('⚠️ Config lokal tersimpan, gagal sync: '+e.message);
   }
 }
 
 async function loadDashboardConfigFromSheets(){
   try {
-    const res = await asGet({ action: 'load_dashboard_config' });
-    if(res.status==='ok' && res.config){
-      const saved = res.config;
+    const rows = await sbGet('kpi_app_config', { config_key: 'eq.dashboard_config', select: 'config_value' });
+    if(rows && rows[0] && rows[0].config_value){
+      const saved = JSON.parse(rows[0].config_value);
       if(Array.isArray(saved.metricsGroups))  dashboardConfig.metricsGroups = saved.metricsGroups;
-      // Legacy migration: convert old featuredMetrics to one group
       else if(Array.isArray(saved.featuredMetrics) && saved.featuredMetrics.length){
         dashboardConfig.metricsGroups = [{
           id: newGroupId(), name:'Semua Metrik', metrics:saved.featuredMetrics
@@ -3391,7 +4068,7 @@ async function loadDashboardConfigFromSheets(){
       if(saved.timeFilter) Object.assign(dashboardConfig.timeFilter, saved.timeFilter);
     }
   } catch(e){
-    console.warn('Gagal load dashboard config dari Sheets:', e.message);
+    console.warn('Gagal load dashboard config dari Supabase:', e.message);
   }
 }
 
@@ -3416,58 +4093,84 @@ function resetSettings(){
 
 async function loadKpiSettingsFromSheets(){
   try {
-    const res = await asGet({ action: 'load_settings' });
-    if(res.status!=='ok' || !res.data || !res.data.length) return;
+    const rows = await sbGet('kpi_settings', { select: '*' });
+    if(!rows || !rows.length) return;
 
-    // Group by pic_id
     const byPic = {};
-    res.data.forEach(row=>{
+    rows.forEach(row=>{
       if(!byPic[row.pic_id]) byPic[row.pic_id]=[];
       byPic[row.pic_id].push(row);
     });
 
-    // Apply ke PICS
-    Object.entries(byPic).forEach(([picId, rows])=>{
+    Object.entries(byPic).forEach(([picId, picRows])=>{
       const pic = PICS.find(p=>p.id===picId);
       if(!pic) return;
-      rows.forEach(row=>{
+      const orderMap = {}; // metric_key -> sort_order, dipakai untuk reorder pic.metrics di bawah
+      picRows.forEach(row=>{
         const m = pic.metrics.find(x=>x.key===row.metric_key);
         if(!m) return;
-        // Restore fields dari Sheets
         if(row.label)          m.label        = row.label;
         if(row.type)           m.type         = row.type;
-        m.lowerBetter = row.lower_better==='TRUE'||row.lower_better===true;
-        m.optional    = row.optional==='TRUE'||row.optional===true;
+        m.lowerBetter = row.lower_better===true;
+        m.optional    = row.optional===true;
         if(row.target_weekly  && row.target_weekly!=='–')  m.target.weekly  = row.target_weekly;
         if(row.target_monthly && row.target_monthly!=='–') m.target.monthly = row.target_monthly;
+        if(row.sort_order !== null && row.sort_order !== undefined) orderMap[row.metric_key] = row.sort_order;
       });
+      // Urutkan pic.metrics sesuai sort_order yang tersimpan (hasil drag & drop sebelumnya).
+      // Metrik yang belum punya sort_order (mis. baru ditambahkan, belum pernah disimpan
+      // dengan kolom ini) ditempatkan di akhir tanpa mengubah urutan relatif sesama mereka.
+      if(Object.keys(orderMap).length){
+        pic.metrics.sort((a,b)=>{
+          const oa = orderMap[a.key], ob = orderMap[b.key];
+          if(oa===undefined && ob===undefined) return 0;
+          if(oa===undefined) return 1;
+          if(ob===undefined) return -1;
+          return oa-ob;
+        });
+      }
     });
   } catch(e){
-    console.warn('Gagal load kpi_settings dari Sheets:', e.message);
+    console.warn('Gagal load kpi_settings dari Supabase:', e.message);
   }
 }
 
 function rebuildForecastMetricSelect(){
-  // Rebuild the forecast metric dropdown based on current PICS
+  // Rebuild the forecast metric dropdown — HANYA tampilkan metrik yang
+  // sudah punya minimal 2 periode data historis, supaya tidak ada pilihan
+  // yang pasti gagal saat forecast dijalankan.
   const sel=document.getElementById('fc-metric');
   if(!sel) return;
   sel.innerHTML='';
+  let anyOption=false;
+
   PICS.forEach(pic=>{
     const grp=document.createElement('optgroup');
     grp.label=pic.animal+' '+pic.name+' — '+pic.role.replace(' Specialist','').replace(' Manager','');
     pic.metrics.filter(m=>!m.optional).forEach(m=>{
-      // Add weekly and monthly options where applicable
       ['weekly','monthly'].forEach(p=>{
-        if(m.target[p]&&m.target[p]!=='–'){
+        const key = m.key+'|'+p;
+        const histCount = historyData.filter(r=>r.key===m.key && r.periodType===p
+          && r.actual && r.actual!=='–' && parseRaw(r.actual)!==null).length;
+        if(histCount >= 2){
           const opt=document.createElement('option');
-          opt.value=m.key+'|'+p;
-          opt.textContent=m.label+' ('+( p==='weekly'?'Weekly':'Monthly')+')';
+          opt.value=key;
+          opt.textContent=m.label+' ('+(p==='weekly'?'Weekly':'Monthly')+') — '+histCount+' periode data';
           grp.appendChild(opt);
+          anyOption=true;
         }
       });
     });
     if(grp.children.length) sel.appendChild(grp);
   });
+
+  const emptyMsg = document.getElementById('fc-empty-msg');
+  if(!anyOption){
+    sel.innerHTML = '<option value="">— Belum ada metrik dengan ≥2 periode data —</option>';
+    if(emptyMsg) emptyMsg.style.display='block';
+  } else if(emptyMsg){
+    emptyMsg.style.display='none';
+  }
 }
 
 /* ============================================================
@@ -3476,7 +4179,7 @@ function rebuildForecastMetricSelect(){
 
 async function syncMembersToSheets(){
   try {
-    const members = PICS.map((pic,i)=>({
+    const members = PICS.map(pic=>({
       id:         pic.id,
       name:       pic.name,
       role:       pic.role,
@@ -3486,27 +4189,22 @@ async function syncMembersToSheets(){
       bstyle:     pic.bstyle,
       is_default: false
     }));
-    const res = await asPost({ action:'save_members', members });
-    if(res.status==='ok'){
-      showToast('✅ Data anggota tim tersimpan ke Sheets.');
-    } else {
-      showToast('⚠️ Gagal sync anggota ke Sheets: '+(res.message||''));
-    }
+    await sbUpsert('kpi_members', members, 'id');
+    showToast('✅ Data anggota tim tersimpan ke Supabase.');
   } catch(e){
-    showToast('⚠️ Gagal sync anggota ke Sheets. Cek koneksi.');
+    showToast('⚠️ Gagal sync anggota ke Supabase. Cek koneksi.');
     console.warn('syncMembersToSheets error:', e.message);
   }
 }
 
 async function loadMembersFromSheets(){
   try {
-    const res = await asGet({ action:'load_members' });
-    if(res.status!=='ok' || !res.data || !res.data.length) return;
+    const data = await sbGet('kpi_members', { select: '*', order: 'created_at.asc' });
+    if(!data || !data.length) return;
 
-    res.data.forEach(m=>{
+    data.forEach(m=>{
       const existing = PICS.find(p=>p.id===m.id);
       if(existing){
-        // Update field yang mungkin berubah (kecuali metrics — itu dari kpi_settings)
         existing.name   = m.name;
         existing.role   = m.role;
         existing.animal = m.animal;
@@ -3514,7 +4212,6 @@ async function loadMembersFromSheets(){
         existing.badge  = m.badge;
         existing.bstyle = m.bstyle;
       } else {
-        // Member baru dari Sheets yang belum ada di PICS lokal
         PICS.push({
           id:      m.id,
           name:    m.name,
@@ -3525,7 +4222,6 @@ async function loadMembersFromSheets(){
           bstyle:  m.bstyle,
           metrics: []
         });
-        // Update PIC_STYLES dan ROLE_COLORS
         const colorMatch = m.bstyle.match(/color:([^;]+)/);
         const color = colorMatch ? colorMatch[1].trim() : '#534AB7';
         PIC_STYLES[m.name] = { animal:m.animal, bg:m.abg, color };
@@ -3533,11 +4229,9 @@ async function loadMembersFromSheets(){
       }
     });
 
-    // Jika Sheets punya data, replace PICS sepenuhnya dengan data Sheets
-    // (kecuali kalau Sheets kosong — biarkan data lokal sebagai fallback)
-    if(res.data.length > 0){
-      const sheetsIds = res.data.map(m=>m.id);
-      const toRemove  = PICS.filter(p=>!sheetsIds.includes(p.id));
+    if(data.length > 0){
+      const dbIds = data.map(m=>m.id);
+      const toRemove = PICS.filter(p=>!dbIds.includes(p.id));
       toRemove.forEach(p=>{
         const idx=PICS.findIndex(x=>x.id===p.id);
         if(idx>=0) PICS.splice(idx,1);
@@ -3631,7 +4325,7 @@ function renderMembersSettings(){
 
     <div style="margin-top:10px;padding:10px 14px;background:var(--yl);border-radius:var(--r);font-size:12px;color:var(--yd)">
       💡 Anggota baru langsung muncul di Dashboard. Gunakan tab <strong>KPI per Anggota</strong>
-      untuk menambahkan metrik KPI-nya. Tambahkan juga kredensial login di sheet <strong>users</strong> di Google Sheets.
+      untuk menambahkan metrik KPI-nya. Admin perlu membuat akun login terpisah di <strong>Supabase Authentication</strong> (format email <code>username@narasi.tv</code>) agar anggota ini bisa login.
     </div>`;
 
   // Set default selection
@@ -3817,6 +4511,12 @@ async function refreshFromSheets(){
     // Re-render setelah semua data masuk
     renderCards();
     renderOverview();
+    rebuildForecastMetricSelect(); // refresh dropdown forecast dengan data historis terbaru
+    // Jika user sedang berada di tab Pengaturan KPI saat refresh ini selesai, render ulang
+    // tabelnya juga — supaya checkbox/field lain langsung mencerminkan data terbaru dari
+    // Supabase tanpa user harus pindah tab dulu untuk memicu render ulang.
+    const settingsPanel = document.getElementById('panel-settings');
+    if(settingsPanel && settingsPanel.classList.contains('active')) renderSettings();
   } catch(e){
     console.warn('Background refresh failed:', e.message);
   }
@@ -3836,39 +4536,92 @@ document.addEventListener('visibilitychange', function(){
     if(ud) ud.textContent = getTodayLabel();
   }
 });
-let forecastChart=null;
-let lastFcResult=null;
+/* ============================================================
+   FORECAST DATA — dibangun dari historyData (data nyata di Supabase),
+   BUKAN data dummy statis. Setiap kali dipanggil, fungsi ini membaca
+   ulang historyData sehingga selalu sinkron dengan data terbaru.
+   ============================================================ */
+function getForecastData(key){
+  // key format: 'metric_key|periodType', misal 'seo_main|weekly'
+  const [metricKey, pType] = key.split('|');
 
-const FORECAST_DATA={
-  'seo_main|weekly':{label:'Organic Traffic — Main Domain',unit:'',data:[420000,510000,488000,560000,530000,575000],periods:['Mg 1','Mg 2','Mg 3','Mg 4','Mg 5','Mg 6'],isRp:false},
-  'seo_main|monthly':{label:'Organic Traffic — Main Domain',unit:'',data:[1800000,2100000,1950000,2300000,2450000,2600000],periods:['Jan','Feb','Mar','Apr','Mei','Jun'],isRp:false},
-  'seo_sub|weekly':{label:'Organic Traffic — Sub Domain',unit:'',data:[180000,210000,195000,230000,215000,245000],periods:['Mg 1','Mg 2','Mg 3','Mg 4','Mg 5','Mg 6'],isRp:false},
-  'seo_sub|monthly':{label:'Organic Traffic — Sub Domain',unit:'',data:[750000,820000,800000,900000,950000,1020000],periods:['Jan','Feb','Mar','Apr','Mei','Jun'],isRp:false},
-  'seo_pv|weekly':{label:'PageViews Organic',unit:'',data:[680000,720000,695000,750000,780000,820000],periods:['Mg 1','Mg 2','Mg 3','Mg 4','Mg 5','Mg 6'],isRp:false},
-  'seo_pv|monthly':{label:'PageViews Organic',unit:'',data:[2800000,3100000,2950000,3300000,3450000,3700000],periods:['Jan','Feb','Mar','Apr','Mei','Jun'],isRp:false},
-  'gr_rev1|weekly':{label:'Revenue YT Narasi',unit:'Jt',data:[12,15,13,18,16,19],periods:['Mg 1','Mg 2','Mg 3','Mg 4','Mg 5','Mg 6'],isRp:true,mul:1000000},
-  'gr_rev1|monthly':{label:'Revenue YT Narasi',unit:'Jt',data:[52,60,55,72,68,78],periods:['Jan','Feb','Mar','Apr','Mei','Jun'],isRp:true,mul:1000000},
-  'gr_rev2|monthly':{label:'Revenue YT Najwa Shihab',unit:'Jt',data:[34,38,36,44,42,48],periods:['Jan','Feb','Mar','Apr','Mei','Jun'],isRp:true,mul:1000000},
-  'gr_rev3|monthly':{label:'Revenue YT Newsroom',unit:'Jt',data:[18,20,19,24,22,26],periods:['Jan','Feb','Mar','Apr','Mei','Jun'],isRp:true,mul:1000000},
-  'ads_spend|weekly':{label:'Ad Spend',unit:'Jt',data:[3.5,3.2,2.8,3.0,2.6,2.4],periods:['Mg 1','Mg 2','Mg 3','Mg 4','Mg 5','Mg 6'],isRp:true,mul:1000000,lowerBetter:true},
-  'ads_spend|monthly':{label:'Ad Spend',unit:'Jt',data:[14,13,11,12,10.5,9.8],periods:['Jan','Feb','Mar','Apr','Mei','Jun'],isRp:true,mul:1000000,lowerBetter:true},
-  'ads_cpc|weekly':{label:'CPC',unit:'Rb',data:[1.2,1.1,1.0,0.9,0.85,0.8],periods:['Mg 1','Mg 2','Mg 3','Mg 4','Mg 5','Mg 6'],isRp:true,mul:1000,lowerBetter:true},
-  'ads_cpc|monthly':{label:'CPC',unit:'Rb',data:[1.3,1.2,1.1,1.0,0.9,0.85],periods:['Jan','Feb','Mar','Apr','Mei','Jun'],isRp:true,mul:1000,lowerBetter:true},
-  'ads_ctr|monthly':{label:'CTR Ads %',unit:'%',data:[2.1,2.3,2.2,2.5,2.6,2.7],periods:['Jan','Feb','Mar','Apr','Mei','Jun'],isRp:false},
-  'wm_vmain|weekly':{label:'Total Views Main Domain',unit:'',data:[80000,92000,88000,95000,91000,98000],periods:['Mg 1','Mg 2','Mg 3','Mg 4','Mg 5','Mg 6'],isRp:false},
-  'wm_vmain|monthly':{label:'Total Views Main Domain',unit:'',data:[320000,370000,355000,390000,380000,410000],periods:['Jan','Feb','Mar','Apr','Mei','Jun'],isRp:false},
-  'wm_vsub|monthly':{label:'Total Views Sub Domain',unit:'',data:[100000,115000,108000,125000,122000,135000],periods:['Jan','Feb','Mar','Apr','Mei','Jun'],isRp:false},
-  'wm_rev|monthly':{label:'Revenue Website',unit:'Jt',data:[28,32,30,34,33,36],periods:['Jan','Feb','Mar','Apr','Mei','Jun'],isRp:true,mul:1000000}
-};
+  // Cari PIC dan metric definition untuk label & tipe (rupiah/persen/dll)
+  let pic=null, m=null;
+  PICS.forEach(p=>{ const f=p.metrics.find(x=>x.key===metricKey); if(f){pic=p;m=f;} });
+  if(!m) return null;
 
-const FUTURE_WEEKLY=['Mg 7','Mg 8','Mg 9','Mg 10','Mg 11','Mg 12','Mg 13','Mg 14','Mg 15','Mg 16','Mg 17','Mg 18'];
-const FUTURE_MONTHLY=['Jul','Ags','Sep','Okt','Nov','Des','Jan\'26','Feb\'26','Mar\'26','Apr\'26','Mei\'26','Jun\'26'];
+  // Ambil semua entri historyData untuk metric ini & periodType ini,
+  // urutkan kronologis berdasarkan label periode
+  const rows = historyData
+    .filter(r=>r.key===metricKey && r.periodType===pType)
+    .filter(r=>r.actual && r.actual!=='–' && parseRaw(r.actual)!==null)
+    .sort((a,b)=>parsePeriodLabel(a.period)-parsePeriodLabel(b.period));
 
-function getFuturePeriods(key,n){
-  return key.endsWith('weekly')?FUTURE_WEEKLY.slice(0,n):FUTURE_MONTHLY.slice(0,n);
+  if(rows.length < 2) return null; // butuh minimal 2 titik data untuk forecast yang berarti
+
+  const data    = rows.map(r=>parseRaw(r.actual));
+  const periods = rows.map(r=>r.period);
+  const isRp    = m.type==='rupiah';
+  const isPct   = m.type==='persen';
+
+  return {
+    label: m.label,
+    unit: isRp?'Rp':(isPct?'%':''),
+    data, periods,
+    isRp, isPct,
+    lowerBetter: !!m.lowerBetter,
+    periodType: pType
+  };
+}
+
+// Generate label periode masa depan secara dinamis, dihitung langsung dari kalender
+// (BUKAN dari WEEKLY_LABELS/MONTHLY_LABELS, karena keduanya hanya berisi periode SAMPAI
+// saat ini — tidak pernah memuat periode masa depan). Ini memastikan label tetap berupa
+// tanggal kalender asli ("18-24 Mei 2026") bahkan untuk horizon besar (kustom, sampai 52),
+// bukan placeholder generik ("Mg+15").
+function getFuturePeriods(key, n){
+  const [, pType] = key.split('|');
+  const future = [];
+
+  if(pType === 'weekly'){
+    // Mulai dari Senin minggu SETELAH minggu berjalan
+    const now = new Date();
+    const dow = now.getDay();
+    const currentMon = new Date(now);
+    currentMon.setDate(now.getDate() - (dow===0?6:dow-1));
+    currentMon.setHours(0,0,0,0);
+
+    const cur = new Date(currentMon);
+    cur.setDate(cur.getDate() + 7); // mulai dari minggu depan
+    for(let i=0; i<n; i++){
+      const mon = new Date(cur);
+      const sun = new Date(cur); sun.setDate(mon.getDate()+6);
+      const monD=mon.getDate(), sunD=sun.getDate();
+      const monM=ID_MONTHS[mon.getMonth()], sunM=ID_MONTHS[sun.getMonth()];
+      let label;
+      if(mon.getMonth()===sun.getMonth()){
+        label = monD+'-'+sunD+' '+sunM+' '+sun.getFullYear();
+      } else {
+        label = monD+' '+monM+'-'+sunD+' '+sunM+' '+sun.getFullYear();
+      }
+      future.push(label);
+      cur.setDate(cur.getDate()+7);
+    }
+  } else {
+    // Mulai dari bulan SETELAH bulan berjalan
+    const now = new Date();
+    const cur = new Date(now.getFullYear(), now.getMonth()+1, 1);
+    for(let i=0; i<n; i++){
+      future.push(ID_MONTHS[cur.getMonth()]+' '+cur.getFullYear());
+      cur.setMonth(cur.getMonth()+1);
+    }
+  }
+
+  return future;
 }
 
 const METHOD_DESC={
+
   'linear':'<strong>📈 Linear Regression:</strong> Menghitung garis tren terbaik dari data historis menggunakan metode least squares. Cocok untuk data dengan tren yang konsisten naik atau turun.',
   'moving_avg':'<strong>〰️ Moving Average:</strong> Menghaluskan fluktuasi data dengan rata-rata 3 periode terakhir. Proyeksi pertama langsung merefleksikan rata-rata terkini. Cocok untuk data dengan pola stabil tanpa tren ekstrem.',
   'exp_smooth':'<strong>🔄 Exponential Smoothing (Holt):</strong> Menggunakan Holt\'s Double Exponential Smoothing — memisahkan komponen <em>level</em> dan <em>trend</em> secara bersamaan (α=0.4, β=0.3). Lebih akurat dari simple SES karena menangkap arah tren yang sedang berjalan.',
@@ -3955,24 +4708,57 @@ function confidenceLevel(method,horizon){
 }
 
 function fmtVal(val,d){
+  if(val===null || val===undefined || isNaN(val)) return '–';
   if(!d) return val.toLocaleString('id-ID',{maximumFractionDigits:1});
-  if(d.unit==='%') return val.toFixed(2)+'%';
+  if(d.isPct) return val.toFixed(2)+'%';
   if(d.isRp){
-    if(d.unit==='Rb') return 'Rp '+val.toFixed(2)+' Rb';
-    return 'Rp '+(val).toFixed(1)+' Jt';
+    if(Math.abs(val)>=1000000) return 'Rp '+(val/1000000).toFixed(1)+' Jt';
+    if(Math.abs(val)>=1000)    return 'Rp '+(val/1000).toFixed(1)+' Rb';
+    return 'Rp '+val.toFixed(0);
   }
-  if(val>=1000000) return (val/1000000).toFixed(2)+' Jt';
-  if(val>=1000) return (val/1000).toFixed(1)+' Rb';
+  if(Math.abs(val)>=1000000) return (val/1000000).toFixed(2)+' Jt';
+  if(Math.abs(val)>=1000)    return (val/1000).toFixed(1)+' Rb';
   return val.toFixed(1);
+}
+
+function onFcHorizonChange(){
+  const sel = document.getElementById('fc-horizon');
+  const wrap = document.getElementById('fc-horizon-custom-wrap');
+  if(!sel || !wrap) return;
+  wrap.style.display = sel.value === 'custom' ? 'block' : 'none';
+}
+
+function clampFcHorizonCustom(){
+  const inp = document.getElementById('fc-horizon-custom');
+  if(!inp) return;
+  let v = parseInt(inp.value);
+  if(isNaN(v)) return; // biarkan kosong saat user masih mengetik
+  if(v < 1)  inp.value = 1;
+  if(v > 52) inp.value = 52;
+}
+
+function getFcHorizon(){
+  const sel = document.getElementById('fc-horizon');
+  if(sel && sel.value === 'custom'){
+    const inp = document.getElementById('fc-horizon-custom');
+    let v = parseInt(inp?.value);
+    if(isNaN(v) || v < 1) v = 1;
+    if(v > 52) v = 52;
+    return v;
+  }
+  return parseInt(sel.value);
 }
 
 function runForecast(){
   const key=document.getElementById('fc-metric').value;
   const method=document.getElementById('fc-method').value;
-  const horizon=parseInt(document.getElementById('fc-horizon').value);
+  const horizon=getFcHorizon();
 
-  const d=FORECAST_DATA[key];
-  if(!d){showToast('⚠️ Data tidak tersedia untuk metrik ini.');return;}
+  const d=getForecastData(key);
+  if(!d){
+    showToast('⚠️ Belum cukup data historis untuk metrik ini (minimal 2 periode yang sudah disubmit).');
+    return;
+  }
 
   let projected=[];
   switch(method){
